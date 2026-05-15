@@ -187,7 +187,7 @@ function styleFor(info, hover, selected) {
   if (isDimmed) return { fillOpacity:0.05, opacity:0.15, fillColor:col, color:'#444', weight:0.5 };
   return {
     fillColor: col,
-    fillOpacity: selected ? 0.35 : hover ? 0.25 : 0.18,
+    fillOpacity: selected ? 0.25 : hover ? 0.2 : 0.15,
     color: isShared ? '#FFD700' : (selected || hover ? '#fff' : col),
     weight: isShared ? 2.5 : selected ? 2.5 : hover ? 2 : 1,
     dashArray: isShared ? '6,3' : null
@@ -490,83 +490,70 @@ async function findVenues() {
   if (!venueSuburbKey) return;
   const btn = document.getElementById('venue-btn');
   btn.disabled = true;
-  btn.textContent = '⏳ Asking Claude…';
+  btn.textContent = '⏳ Finding venues…';
 
   const layer = allLayers[venueSuburbKey];
   if (!layer) { btn.textContent = '⚠ Suburb not on map'; btn.disabled = false; return; }
 
-  const suburbName = venueSuburbKey.charAt(0) + venueSuburbKey.slice(1).toLowerCase();
-  const center = layer.getBounds().getCenter();
+  const bounds = layer.getBounds();
+  const s = bounds.getSouth(), n = bounds.getNorth(), w = bounds.getWest(), e = bounds.getEast();
 
-  const prompt = `List up to 20 real venues (restaurants, cafes, bars, pubs, hotels, nightclubs, bottle shops) in ${suburbName}, Victoria, Australia.
-
-Return ONLY a JSON array, no other text, no markdown, no explanation:
-[
-  {"name": "Venue Name", "type": "restaurant", "address": "123 Example St", "lat": -37.1234, "lng": 144.5678},
-  ...
-]
-
-CRITICAL RULES:
-- Only include venues you are CERTAIN exist at a SPECIFIC street address in ${suburbName}
-- Coordinates must be the EXACT location of that venue's street address, not the suburb centre
-- The suburb centre is approximately (${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}) — spread venues across their real addresses, do NOT cluster them all near this point
-- If you are unsure of a venue's exact coordinates, omit it entirely
-- Types must be one of: restaurant, cafe, bar, pub, hotel, nightclub, bottle shop, winery
-- Return ONLY the JSON array, nothing else`;
+  const query = `[out:json][timeout:25];
+(
+  node["amenity"~"restaurant|cafe|bar|pub|nightclub|fast_food|food_court"](${s},${w},${n},${e});
+  node["amenity"="bottle_shop"](${s},${w},${n},${e});
+  node["shop"~"alcohol|wine"](${s},${w},${n},${e});
+  node["tourism"="hotel"](${s},${w},${n},${e});
+  node["amenity"="hotel"](${s},${w},${n},${e});
+);
+out body;`;
 
   try {
-    const resp = await fetch('https://anthropic-proxy.joshua-torney.workers.dev', {
+    const resp = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: query
     });
 
-    if (!resp.ok) throw new Error(`API error ${resp.status}`);
+    if (!resp.ok) throw new Error(`Overpass error ${resp.status}`);
     const data = await resp.json();
-    console.log('Worker response:', JSON.stringify(data));
-    
-    if (data.type === 'error') {
-      if (data.error?.type === 'overloaded_error') throw new Error('API busy, please try again');
-      throw new Error(data.error?.message || 'API error');
-    }
-    
-    const text = data.content?.[0]?.text || '';
-    console.log('Extracted text:', text);
+    const elements = data.elements || [];
 
-    // Parse JSON from response
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error('No venue data returned');
-    const venues = JSON.parse(match[0]);
-
-    if (!venues.length) {
+    if (!elements.length) {
       btn.textContent = '⚠ No venues found';
       btn.disabled = false;
       return;
     }
 
     clearVenues();
-    venues.forEach(v => {
-      if (!v.lat || !v.lng || !v.name) return;
+    let count = 0;
+    elements.forEach(v => {
+      if (!v.lat || !v.lon || !v.tags || !v.tags.name) return;
+      const amenity = v.tags.amenity || v.tags.shop || v.tags.tourism || '';
+      const typeMap = {
+        restaurant: 'restaurant', cafe: 'cafe', bar: 'bar', pub: 'pub',
+        nightclub: 'nightclub', fast_food: 'restaurant', food_court: 'restaurant',
+        hotel: 'hotel', bottle_shop: 'bottle shop', alcohol: 'bottle shop', wine: 'bottle shop'
+      };
+      const type = typeMap[amenity] || amenity;
+      const address = [v.tags['addr:housenumber'], v.tags['addr:street']].filter(Boolean).join(' ');
+
       const icon = L.divIcon({
         className: '',
         html: '<div class="venue-dot"></div>',
         iconSize: [22,22], iconAnchor: [11,11],
       });
-      const marker = L.marker([v.lat, v.lng], { icon }).addTo(map);
+      const marker = L.marker([v.lat, v.lon], { icon }).addTo(map);
       marker.bindPopup(`
         <div class="venue-popup">
-          <strong>${v.name}</strong>
-          <span class="vtype">${v.type}</span>
-          ${v.address ? `<div>${v.address}</div>` : ''}
+          <strong>${v.tags.name}</strong>
+          <span class="vtype">${type}</span>
+          ${address ? `<div>${address}</div>` : ''}
         </div>`);
       venueMarkers.push(marker);
+      count++;
     });
 
-    btn.textContent = `✓ ${venueMarkers.length} venues found`;
+    btn.textContent = `✓ ${count} venues found`;
     document.getElementById('clear-venues-btn').style.display = 'block';
   } catch(err) {
     btn.textContent = '⚠ Failed: ' + err.message;
