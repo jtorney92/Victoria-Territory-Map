@@ -89,15 +89,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
 #venue-legend .leg-item { display:flex; align-items:center; gap:5px; margin:3px 0; cursor:pointer; user-select:none; }
 #venue-legend .leg-item.hidden-type { opacity:0.4; }
 #venue-legend .leg-dot { width:12px; height:12px; border-radius:50%; border:2px solid #fff; flex-shrink:0; }
-#venue-notes-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9000; align-items:center; justify-content:center; }
-#venue-notes-modal.open { display:flex; }
-#venue-notes-box { background:#1a1a2e; border:1px solid #e94560; border-radius:10px; padding:20px; width:320px; }
-#venue-notes-box h4 { color:#e94560; margin:0 0 10px; font-size:14px; }
-#venue-notes-box textarea { width:100%; height:100px; background:#0f3460; color:#eee; border:1px solid #333; border-radius:6px; padding:8px; font-size:12px; resize:vertical; box-sizing:border-box; }
-#venue-notes-box .note-btns { display:flex; gap:8px; margin-top:10px; }
-#venue-notes-box button { flex:1; padding:8px; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; }
-#btn-save-note { background:#e94560; color:#fff; }
-#btn-close-note { background:#333; color:#aaa; }
+
 .venue-popup { font-size:12px; line-height:1.5; min-width:180px; }
 .venue-popup strong { font-size:13px; display:block; margin-bottom:2px; }
 .venue-popup .vtype { color:#888; font-size:11px; }
@@ -160,16 +152,6 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
     <div id="venue-legend"></div>
   </div>
 
-  <div id="venue-notes-modal">
-    <div id="venue-notes-box">
-      <h4 id="note-venue-name"></h4>
-      <textarea id="note-text" placeholder="Add visit notes..."></textarea>
-      <div class="note-btns">
-        <button id="btn-save-note" onclick="saveNote()">💾 Save Note</button>
-        <button id="btn-close-note" onclick="closeNoteModal()">Cancel</button>
-      </div>
-    </div>
-  </div>
 
   <div id="save-bar">
     <span>⚠ Unsaved changes</span>
@@ -558,25 +540,6 @@ function toggleVenueType(cssType, item) {
   });
 }
 
-let currentNoteKey = null;
-function openNoteModal(noteKey, venueName, btn) {
-  currentNoteKey = noteKey;
-  document.getElementById('note-venue-name').textContent = venueName;
-  document.getElementById('note-text').value = localStorage.getItem(noteKey) || '';
-  document.getElementById('venue-notes-modal').classList.add('open');
-}
-
-function saveNote() {
-  const text = document.getElementById('note-text').value.trim();
-  if (text) localStorage.setItem(currentNoteKey, text);
-  else localStorage.removeItem(currentNoteKey);
-  document.getElementById('venue-notes-modal').classList.remove('open');
-}
-
-function closeNoteModal() {
-  document.getElementById('venue-notes-modal').classList.remove('open');
-}
-
 async function findVenues() {
   if (!venueSuburbKey) return;
   const btn = document.getElementById('venue-btn');
@@ -630,9 +593,6 @@ out body;`;
       const cssType = type.replace(' ', '-');
       const address = [v.tags['addr:housenumber'], v.tags['addr:street']].filter(Boolean).join(' ');
       const venueName = v.tags.name;
-      const noteKey = 'note_' + venueName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
-      const savedNote = localStorage.getItem(noteKey) || '';
-
       const icon = L.divIcon({
         className: '',
         html: `<div class="venue-dot ${cssType}" data-type="${cssType}"></div>`,
@@ -640,17 +600,14 @@ out body;`;
       });
       const marker = L.marker([v.lat, v.lon], { icon }).addTo(map);
       marker._venueType = cssType;
-      marker._noteKey = noteKey;
       marker._venueName = venueName;
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueName + ' ' + (address || ''))}`;
       marker.bindPopup(`
         <div class="venue-popup">
           <strong>${venueName}</strong>
           <span class="vtype">${type}</span>
           ${address ? `<div style="color:#aaa;font-size:11px">${address}</div>` : ''}
-          ${savedNote ? `<div style="margin-top:6px;font-size:11px;color:#FFD700">📝 ${savedNote}</div>` : ''}
-          <button onclick="openNoteModal('${noteKey}','${venueName.replace(/'/g,"\'")}', this)" style="margin-top:8px;padding:4px 10px;background:#0f3460;color:#eee;border:1px solid #555;border-radius:4px;font-size:11px;cursor:pointer;">
-            ${savedNote ? '✏️ Edit note' : '📝 Add note'}
-          </button>
+          <a href="${mapsUrl}" target="_blank" style="display:inline-block;margin-top:8px;padding:4px 10px;background:#4285F4;color:#fff;border-radius:4px;font-size:11px;text-decoration:none;">📍 Open in Google Maps</a>
         </div>`);
       venueMarkers.push(marker);
       typeCounts[type] = (typeCounts[type] || 0) + 1;
