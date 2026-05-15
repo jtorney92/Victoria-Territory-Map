@@ -187,7 +187,7 @@ function styleFor(info, hover, selected) {
   if (isDimmed) return { fillOpacity:0.05, opacity:0.15, fillColor:col, color:'#444', weight:0.5 };
   return {
     fillColor: col,
-    fillOpacity: selected ? 0.9 : hover ? 0.78 : 0.62,
+    fillOpacity: selected ? 0.35 : hover ? 0.25 : 0.18,
     color: isShared ? '#FFD700' : (selected || hover ? '#fff' : col),
     weight: isShared ? 2.5 : selected ? 2.5 : hover ? 2 : 1,
     dashArray: isShared ? '6,3' : null
@@ -498,17 +498,21 @@ async function findVenues() {
   const suburbName = venueSuburbKey.charAt(0) + venueSuburbKey.slice(1).toLowerCase();
   const center = layer.getBounds().getCenter();
 
-  const prompt = `List up to 20 restaurants, cafes, bars, pubs, hotels, nightclubs, and bottle shops/wine shops in ${suburbName}, Victoria, Australia.
+  const prompt = `List up to 20 real venues (restaurants, cafes, bars, pubs, hotels, nightclubs, bottle shops) in ${suburbName}, Victoria, Australia.
 
-For each venue return ONLY a JSON array (no other text, no markdown) in this exact format:
+Return ONLY a JSON array, no other text, no markdown, no explanation:
 [
   {"name": "Venue Name", "type": "restaurant", "address": "123 Example St", "lat": -37.1234, "lng": 144.5678},
   ...
 ]
 
-Types must be one of: restaurant, cafe, bar, pub, hotel, nightclub, bottle shop, winery.
-Coordinates must be real and accurate for ${suburbName} Victoria (near ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}).
-Only include venues you are confident exist in ${suburbName} specifically. Return ONLY the JSON array.`;
+CRITICAL RULES:
+- Only include venues you are CERTAIN exist at a SPECIFIC street address in ${suburbName}
+- Coordinates must be the EXACT location of that venue's street address, not the suburb centre
+- The suburb centre is approximately (${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}) — spread venues across their real addresses, do NOT cluster them all near this point
+- If you are unsure of a venue's exact coordinates, omit it entirely
+- Types must be one of: restaurant, cafe, bar, pub, hotel, nightclub, bottle shop, winery
+- Return ONLY the JSON array, nothing else`;
 
   try {
     const resp = await fetch('https://anthropic-proxy.joshua-torney.workers.dev', {
@@ -524,6 +528,12 @@ Only include venues you are confident exist in ${suburbName} specifically. Retur
     if (!resp.ok) throw new Error(`API error ${resp.status}`);
     const data = await resp.json();
     console.log('Worker response:', JSON.stringify(data));
+    
+    if (data.type === 'error') {
+      if (data.error?.type === 'overloaded_error') throw new Error('API busy, please try again');
+      throw new Error(data.error?.message || 'API error');
+    }
+    
     const text = data.content?.[0]?.text || '';
     console.log('Extracted text:', text);
 
