@@ -231,14 +231,6 @@ function setMode(mode) {
   document.getElementById('btn-edit-mode').classList.toggle('active', mode === 'edit');
   document.getElementById('view-panel').style.display = mode === 'view' ? 'block' : 'none';
   document.getElementById('edit-panel').style.display = mode === 'edit' ? 'block' : 'none';
-  // When switching to Edit tab, render the edit panel if a suburb is locked
-  if (mode === 'edit') {
-    if (activeSuburbKey) {
-      renderEditPanel(activeSuburbKey);
-    } else {
-      document.getElementById('edit-panel').innerHTML = '<div class="ep-placeholder" style="color:#555;font-size:13px;text-align:center;margin-top:40px">✏️ Click a suburb on the map first, then switch to Edit</div>';
-    }
-  }
 }
 
 // ── VIEW PANEL ────────────────────────────────────────────────────────────────
@@ -684,57 +676,57 @@ loadGeoJSON().then(geojson => {
       allLayers[key] = layer;
 
       layer.on('mouseover', () => {
-        if (selectedLayer !== layer) {
-          if (info) { layer.setStyle(styleFor(info, true, false)); renderViewPanel(info); }
-          else {
-            layer.setStyle({ fillColor:'#aaa', fillOpacity:0.3, color:'#fff', weight:1.5 });
-            document.getElementById('view-panel').innerHTML = `<h2>${raw}</h2><div class="placeholder" style="margin-top:12px">No customers in this suburb</div>`;
-          }
-          // Always show view panel on hover
-          document.getElementById('view-panel').style.display = 'block';
-          document.getElementById('edit-panel').style.display = 'none';
+        // Completely ignore hover if ANY suburb is locked
+        if (selectedLayer) return;
+        if (info) { layer.setStyle(styleFor(info, true, false)); renderViewPanel(info); }
+        else {
+          layer.setStyle({ fillColor:'#aaa', fillOpacity:0.3, color:'#fff', weight:1.5 });
+          document.getElementById('view-panel').innerHTML = `<h2>${raw}</h2><div class="placeholder" style="margin-top:12px">No customers in this suburb</div>`;
         }
+        document.getElementById('view-panel').style.display = 'block';
+        document.getElementById('edit-panel').style.display = 'none';
       });
 
       layer.on('mouseout', () => {
-        if (selectedLayer !== layer) {
-          if (info) layer.setStyle(styleFor(info, false, false));
-          else layer.setStyle({ fillColor:'#333', fillOpacity:0.15, color:'#555', weight:0.5, opacity:0.5 });
-          clearViewPanel();
-          // Restore mode panels
-          document.getElementById('view-panel').style.display = currentMode === 'view' ? 'block' : 'none';
-          document.getElementById('edit-panel').style.display = currentMode === 'edit' ? 'block' : 'none';
-        }
+        // Completely ignore mouseout if ANY suburb is locked
+        if (selectedLayer) return;
+        if (info) layer.setStyle(styleFor(info, false, false));
+        else layer.setStyle({ fillColor:'#333', fillOpacity:0.15, color:'#555', weight:0.5, opacity:0.5 });
+        clearViewPanel();
       });
 
-      layer.on('click', () => {
+      layer.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
         const wasSelected = selectedLayer === layer;
-        // Deselect previous
+
+        // Unlock previously selected suburb
         if (selectedLayer && selectedLayer !== layer) {
           const prevKey = getSuburbName(selectedLayer.feature.properties).toUpperCase();
           const prevInfo = lookup[prevKey];
           if (prevInfo) selectedLayer.setStyle(styleFor(prevInfo, false, false));
           else selectedLayer.setStyle({ fillColor:'#333', fillOpacity:0.15, color:'#555', weight:0.5, opacity:0.5 });
         }
+
         if (wasSelected) {
-          // Deselect
+          // Click same suburb again = unlock
           selectedLayer = null;
           activeSuburbKey = null;
           if (info) layer.setStyle(styleFor(info, false, false));
           else layer.setStyle({ fillColor:'#333', fillOpacity:0.15, color:'#555', weight:0.5, opacity:0.5 });
-          hideVenueButton();
+          showVenueButton(null);
           setMode('view');
           clearViewPanel();
         } else {
-          // Select
+          // Lock this suburb — sidebar stays frozen until unlocked
           selectedLayer = layer;
           activeSuburbKey = key;
           if (info) layer.setStyle(styleFor(info, false, true));
           else layer.setStyle({ fillColor:'#aaa', fillOpacity:0.4, color:'#fff', weight:2 });
           showVenueButton(key);
-          setMode('edit');
-          if (info) renderEditPanel(key);
-          else document.getElementById('edit-panel').innerHTML = `<h2>${raw}</h2><div class="placeholder" style="margin-top:12px">No customers yet.<br>Use the form below to add one.</div>`;
+          // Land on View tab, populate it
+          setMode('view');
+          if (info) renderViewPanel(info);
+          else document.getElementById('view-panel').innerHTML = `<h2>${raw}</h2><div class="placeholder" style="margin-top:12px">No customers yet.<br>Switch to Edit tab to add one.</div>`;
         }
       });
     }
