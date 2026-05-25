@@ -14,11 +14,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .card { background: white; border-radius: 10px; padding: 18px 22px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
 .card h2 { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; }
 .btn { padding: 9px 22px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; }
-.btn-start { background: #e94560; color: white; }
-.btn-start:hover { background: #c73652; }
-.btn-start:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-dl { background: #2e7d32; color: white; }
-.btn-dl:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-start { background: #e94560; color: white; } .btn-start:hover { background: #c73652; } .btn-start:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-dl { background: #2e7d32; color: white; } .btn-dl:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-pause { background: #555; color: white; }
 .btn-stop { background: #eee; color: #333; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -26,50 +23,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .progress-fill { height: 100%; background: linear-gradient(90deg,#e94560,#ff7043); border-radius: 6px; transition: width 0.4s; }
 .stats { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
 .stat { background: #f8f9fa; border-radius: 8px; padding: 8px 16px; text-align: center; min-width: 80px; }
-.stat .n { font-size: 24px; font-weight: 700; }
-.stat .l { font-size: 11px; color: #888; }
-.green .n { color: #2e7d32; }
-.red   .n { color: #c62828; }
-.grey  .n { color: #555; }
+.stat .n { font-size: 24px; font-weight: 700; } .stat .l { font-size: 11px; color: #888; }
+.green .n { color: #2e7d32; } .red .n { color: #c62828; } .grey .n { color: #555; }
 #log { height: 220px; overflow-y: auto; background: #111827; border-radius: 6px; padding: 10px 12px; font-family: monospace; font-size: 12px; color: #9ca3af; margin-top: 10px; }
-.ok   { color: #34d399; }
-.fail { color: #f87171; }
-.info { color: #60a5fa; }
-.warn { color: #fbbf24; }
+.ok { color: #34d399; } .fail { color: #f87171; } .info { color: #60a5fa; } .warn { color: #fbbf24; }
 .table-wrap { max-height: 380px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { background: #f9fafb; padding: 8px 10px; text-align: left; font-weight: 600; color: #555; position: sticky; top: 0; border-bottom: 1px solid #e5e7eb; }
 td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }
-tr:last-child td { border-bottom: none; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
-.b-ok   { background: #d1fae5; color: #065f46; }
-.b-fail { background: #fee2e2; color: #991b1b; }
+.b-ok { background: #d1fae5; color: #065f46; } .b-fail { background: #fee2e2; color: #991b1b; }
 .note { font-size: 12px; color: #888; line-height: 1.6; margin-top: 8px; }
 </style>
 </head>
 <body>
-
 <div class="header">
-  <div>
-    <h1>🔍 Venue Address Lookup</h1>
-    <small>342 venues · OpenStreetMap Nominatim · No account needed</small>
-  </div>
+  <div><h1>🔍 Venue Address Lookup</h1><small>342 venues · OpenStreetMap Nominatim · No account needed</small></div>
   <div class="row">
     <button class="btn btn-start" id="startBtn" onclick="startLookup()">▶ Start Lookup</button>
     <button class="btn btn-dl" id="dlBtn" onclick="downloadCSV()" disabled>⬇ Download CSV</button>
   </div>
 </div>
-
 <div class="container">
   <div class="card">
     <h2>How it works</h2>
-    <p class="note">
-      Searches OpenStreetMap for each venue automatically — no key or account needed.<br>
-      Processes <strong>1 venue per second</strong> to respect rate limits (~6 mins for all 342).<br>
-      Download the CSV anytime, even mid-run, then drop it back into Claude to add to the map.
-    </p>
+    <p class="note">Searches OpenStreetMap for each venue — no key or account needed. Processes 1 per second (~6 mins for all 342). Only returns an address if the result is a confident match — no guesses. Download CSV anytime and drop back into Claude to add to the map.</p>
   </div>
-
   <div class="card" id="progressCard" style="display:none">
     <h2>Progress <span id="progText" style="font-size:12px;font-weight:400;color:#888;margin-left:8px"></span></h2>
     <div class="progress-track"><div class="progress-fill" id="pbar" style="width:0%"></div></div>
@@ -84,7 +63,6 @@ tr:last-child td { border-bottom: none; }
     </div>
     <div id="log"><span class="info">Waiting to start…</span></div>
   </div>
-
   <div class="card" id="resultsCard" style="display:none">
     <h2>Results</h2>
     <div class="table-wrap">
@@ -98,19 +76,58 @@ tr:last-child td { border-bottom: none; }
 
 <script>
 const VENUES = [{"id": "38061", "name": "Ahn Ahn", "rep": "Angelo Giacobbe"}, {"id": "38189", "name": "Ajisai Japanese restaurant", "rep": "Martin Kelliher"}, {"id": "39314", "name": "Albert park deli", "rep": "Martin Kelliher"}, {"id": "36945", "name": "Alberts Wine Bar", "rep": "Brad Armstrong"}, {"id": "37636", "name": "Amazon State", "rep": "Angelo Giacobbe"}, {"id": "37254", "name": "ANAM", "rep": "Angelo Giacobbe"}, {"id": "36483", "name": "Anchorage caravan park", "rep": "Martin Kelliher"}, {"id": "39267", "name": "Anglo Melbourne", "rep": "Martin Kelliher"}, {"id": "39356", "name": "Annabel’s Wine Bar", "rep": "Brad Armstrong"}, {"id": "37284", "name": "Atlantic Group", "rep": "Brad Armstrong"}, {"id": "37654", "name": "Atlas", "rep": "Brad Armstrong"}, {"id": "35906", "name": "Atman Restaurant Geelong", "rep": "Gaby McIntosh"}, {"id": "37505", "name": "Baia", "rep": "Brad Armstrong"}, {"id": "38973", "name": "Balcombe Station", "rep": "Brad Armstrong"}, {"id": "38324", "name": "Bang bang", "rep": "Brad Armstrong"}, {"id": "37715", "name": "Bantatthong Thai", "rep": "Martin Kelliher"}, {"id": "38294", "name": "Bar Ricci", "rep": "Brad Armstrong"}, {"id": "38721", "name": "Bar Sophia", "rep": "Angelo Giacobbe"}, {"id": "39030", "name": "Barrabool Gin", "rep": "Brad Armstrong"}, {"id": "36740", "name": "Bay road liquor", "rep": "Martin Kelliher"}, {"id": "39265", "name": "Bayside Geelong Hotel (Franca’s)", "rep": "Gaby McIntosh"}, {"id": "38343", "name": "Bellview Cellars", "rep": "Angelo Giacobbe"}, {"id": "38344", "name": "Bellvue Cellars", "rep": "Angelo Giacobbe"}, {"id": "37708", "name": "Black Drop Espresso & Wine", "rep": "Brad Armstrong"}, {"id": "37943", "name": "Bleakhouse Hotel", "rep": "Brad Armstrong"}, {"id": "37301", "name": "Blondie Bar", "rep": "Brad Armstrong"}, {"id": "39114", "name": "Booran Rd Cellars", "rep": "Angelo Giacobbe"}, {"id": "35840", "name": "Bottle O Glen Huntly", "rep": "Angelo Giacobbe"}, {"id": "37733", "name": "Bottle O Yarram", "rep": "Martin Kelliher"}, {"id": "35926", "name": "Bottlemart Blackburn", "rep": "Angelo Giacobbe"}, {"id": "36173", "name": "Bottlemart Express Richmond", "rep": "Angelo Giacobbe"}, {"id": "38032", "name": "Bottlemart MCity", "rep": "Angelo Giacobbe"}, {"id": "36077", "name": "Bottlemart Moe", "rep": "Martin Kelliher"}, {"id": "39157", "name": "Bottlemart Yarraville", "rep": "Jason O’Brien"}, {"id": "38339", "name": "Brighton Elwood Elsternwick Bowling Club", "rep": "Brad Armstrong"}, {"id": "37155", "name": "Brown Cow", "rep": "Brad Armstrong"}, {"id": "36308", "name": "Brown Rice", "rep": "Martin Kelliher"}, {"id": "36645", "name": "Burwood Teppanyaki", "rep": "Martin Kelliher"}, {"id": "39008", "name": "Butcher & Vine", "rep": "Brad Armstrong"}, {"id": "37519", "name": "Butcher’s Prime", "rep": "Brad Armstrong"}, {"id": "37253", "name": "Cafe Odo Beer & Wine", "rep": "Brad Armstrong"}, {"id": "39113", "name": "Cafe Sapore", "rep": "Angelo Giacobbe"}, {"id": "38900", "name": "Caffe' Greco", "rep": "Angelo Giacobbe"}, {"id": "39192", "name": "Camberwell Cricket Club", "rep": "Angelo Giacobbe"}, {"id": "38611", "name": "Casa Mariotti", "rep": "Angelo Giacobbe"}, {"id": "37258", "name": "Cellarbrations Black Rock", "rep": "Brad Armstrong"}, {"id": "36719", "name": "Cellarbrations Casey", "rep": "Martin Kelliher"}, {"id": "36760", "name": "Cellarbrations Elsternwick", "rep": "Angelo Giacobbe"}, {"id": "36075", "name": "Cellarbrations Koo Wee Rup", "rep": "Martin Kelliher"}, {"id": "37603", "name": "Cellarbrations Pinewood", "rep": "Angelo Giacobbe"}, {"id": "39143", "name": "Cellarbrations Royale", "rep": "Jason O’Brien"}, {"id": "35927", "name": "Cellarbrations South Wharf", "rep": "Jason O’Brien"}, {"id": "37527", "name": "Cellarbrations Wheelers Hill", "rep": "Angelo Giacobbe"}, {"id": "37638", "name": "Centanni", "rep": "Angelo Giacobbe"}, {"id": "38391", "name": "Central Park Cellars", "rep": "Angelo Giacobbe"}, {"id": "38049", "name": "Chancery Lane", "rep": "Brad Armstrong"}, {"id": "38763", "name": "Cheltenham cellars", "rep": "Martin Kelliher"}, {"id": "38327", "name": "Chi Bu Seafood Bar", "rep": "Angelo Giacobbe"}, {"id": "36203", "name": "Chisholm Institute", "rep": "Martin Kelliher"}, {"id": "36667", "name": "Chou Chou", "rep": "Angelo Giacobbe"}, {"id": "37641", "name": "Clover Bar", "rep": "Angelo Giacobbe"}, {"id": "39127", "name": "Club Tarneit", "rep": "Gaby McIntosh"}, {"id": "37230", "name": "Clyde Hotel", "rep": "Angelo Giacobbe"}, {"id": "37772", "name": "Coco Apollo bay", "rep": "Leanne Grigg"}, {"id": "36880", "name": "Colac Bowling Club by the Lake", "rep": "Gaby McIntosh"}, {"id": "37959", "name": "Colac Otway Performing Arts & Cultural Centre", "rep": "Gaby McIntosh"}, {"id": "35908", "name": "Coop on Pascoe", "rep": "Leanne Grigg"}, {"id": "36603", "name": "Court house bar & grill Warragul", "rep": "Martin Kelliher"}, {"id": "39139", "name": "Cucina di Gio'", "rep": "Angelo Giacobbe"}, {"id": "39348", "name": "Cucina Toorak", "rep": "Angelo Giacobbe"}, {"id": "36266", "name": "Cultura (Bella Chara)", "rep": "Rob Kinch"}, {"id": "37427", "name": "Cyan Bar & Lounge", "rep": "Brad Armstrong"}, {"id": "38053", "name": "Downtown Grocer", "rep": "Angelo Giacobbe"}, {"id": "38762", "name": "Dr Morse Cafe", "rep": "Angelo Giacobbe"}, {"id": "39015", "name": "Duke of Albany", "rep": "Angelo Giacobbe"}, {"id": "37081", "name": "Dutch Club Abel Tasman", "rep": "Brad Armstrong"}, {"id": "36372", "name": "East Malvern community bank (Bendigo Bnk)", "rep": "Martin Kelliher"}, {"id": "36696", "name": "Edge Geelong", "rep": "Rob Kinch"}, {"id": "37415", "name": "Elsternwick Sports Club", "rep": "Brad Armstrong"}, {"id": "38901", "name": "Elwood bowling club", "rep": "Martin Kelliher"}, {"id": "37942", "name": "Entrecote", "rep": "Brad Armstrong"}, {"id": "37158", "name": "Errol’s Café", "rep": "Brad Armstrong"}, {"id": "36605", "name": "Everything’s better with wine", "rep": "Martin Kelliher"}, {"id": "39007", "name": "Fans Asian Restaurant & Bar", "rep": "Brad Armstrong"}, {"id": "38246", "name": "Fantome Winebar", "rep": "Gaby McIntosh"}, {"id": "37375", "name": "Fat Jak’s", "rep": "Brad Armstrong"}, {"id": "36737", "name": "Fiorelli's", "rep": "Angelo Giacobbe"}, {"id": "36938", "name": "Five iron golf", "rep": "Martin Kelliher"}, {"id": "36739", "name": "Flippin fresh", "rep": "Leanne Grigg"}, {"id": "36915", "name": "Flying fox bar", "rep": "Leanne Grigg"}, {"id": "38550", "name": "Founders & Co Lara", "rep": "Gaby McIntosh"}, {"id": "38192", "name": "Fratelli", "rep": "Brad Armstrong"}, {"id": "37635", "name": "Garage Wine Bar", "rep": "Angelo Giacobbe"}, {"id": "37473", "name": "Garf Bar", "rep": "Brad Armstrong"}, {"id": "37799", "name": "Garfs Bar", "rep": "Brad Armstrong"}, {"id": "37741", "name": "Gasworks Arts Park", "rep": "Martin Kelliher"}, {"id": "38069", "name": "Gaylord Indian Restaurant", "rep": "Brad Armstrong"}, {"id": "35849", "name": "GC Liquor Supercellars", "rep": "Angelo Giacobbe"}, {"id": "39059", "name": "Global Liquor", "rep": "Angelo Giacobbe"}, {"id": "39039", "name": "Godby Hotel", "rep": "Brad Armstrong"}, {"id": "39067", "name": "Grainery Lane", "rep": "Trudi Alcock"}, {"id": "39257", "name": "Grandy’s Liquor Moorabin", "rep": "Martin Kelliher"}, {"id": "36131", "name": "Grantville Foodworks", "rep": "Martin Kelliher"}, {"id": "38108", "name": "Green Leaf Cafe & Bar", "rep": "Brad Armstrong"}, {"id": "37444", "name": "Griggs Creek", "rep": "Gaby McIntosh"}, {"id": "38491", "name": "Groove Train Blackburn", "rep": "Angelo Giacobbe"}, {"id": "38584", "name": "Guljack Rhapsody Kew", "rep": "Angelo Giacobbe"}, {"id": "38870", "name": "Harry Brown Colac", "rep": "Leanne Grigg"}, {"id": "38310", "name": "Hartwell Cellars", "rep": "Angelo Giacobbe"}, {"id": "37364", "name": "Harvey’s Sports Bar & Grill", "rep": "Brad Armstrong"}, {"id": "36744", "name": "Havana Caravan Bar", "rep": "Leanne Grigg"}, {"id": "37322", "name": "Hawker Typhoon", "rep": "Brad Armstrong"}, {"id": "38577", "name": "Hayashi291", "rep": "Angelo Giacobbe"}, {"id": "38548", "name": "Hayes Winckle Lara", "rep": "Gaby McIntosh"}, {"id": "37050", "name": "HER", "rep": "Brad Armstrong"}, {"id": "36931", "name": "Hobsons", "rep": "Brad Armstrong"}, {"id": "39179", "name": "Hotel House", "rep": "Jason O’Brien"}, {"id": "37351", "name": "Hotel Lona", "rep": "Brad Armstrong"}, {"id": "37217", "name": "Hotel Nacional", "rep": "Brad Armstrong"}, {"id": "38369", "name": "Hotel Paradiso", "rep": "Martin Kelliher"}, {"id": "36783", "name": "Hudsons Road Wine & Beer *NEW OWNER", "rep": "Jason O’Brien"}, {"id": "38650", "name": "Hygeia Party Boat Geelong", "rep": "Gaby McIntosh"}, {"id": "36485", "name": "Hyland at Foodworks", "rep": "Martin Kelliher"}, {"id": "38947", "name": "I Made", "rep": "Brad Armstrong"}, {"id": "37368", "name": "Iddy Biddy", "rep": "Brad Armstrong"}, {"id": "36812", "name": "IGA Altona North", "rep": "Jason O’Brien"}, {"id": "36071", "name": "IGA Bunyip", "rep": "Martin Kelliher"}, {"id": "38444", "name": "IGA Clunes", "rep": "Trudi Alcock"}, {"id": "36965", "name": "IGA Foster", "rep": "Martin Kelliher"}, {"id": "38379", "name": "IGA Hughesdale", "rep": "Angelo Giacobbe"}, {"id": "37686", "name": "Ingenia Federation Werribee", "rep": "Gaby McIntosh"}, {"id": "38445", "name": "Invergordon", "rep": "Brad Armstrong"}, {"id": "36761", "name": "Itinerant Spirits", "rep": "Trudi Alcock"}, {"id": "38630", "name": "JA2", "rep": "Angelo Giacobbe"}, {"id": "36942", "name": "Jan Juc surf club", "rep": "Leanne Grigg"}, {"id": "37791", "name": "Jazz Ria", "rep": "Angelo Giacobbe"}, {"id": "35857", "name": "Jefferies of Blackburn", "rep": "Jason O’Brien"}, {"id": "36335", "name": "Jeffries Supermarket Blackburn", "rep": "Jason O’Brien"}, {"id": "37374", "name": "Jekyll & Hyde", "rep": "Brad Armstrong"}, {"id": "37373", "name": "Jimmy O’Neill’s", "rep": "Brad Armstrong"}, {"id": "38780", "name": "Just Italy Mentone", "rep": "Brad Armstrong"}, {"id": "38689", "name": "Keysborough golf club", "rep": "Martin Kelliher"}, {"id": "38748", "name": "Kickin’ Inn", "rep": "Brad Armstrong"}, {"id": "38104", "name": "Kokoro Brighton", "rep": "Brad Armstrong"}, {"id": "37211", "name": "Krabby’s Crab Boil", "rep": "Brad Armstrong"}, {"id": "38429", "name": "La Bottega Trattoria", "rep": "Angelo Giacobbe"}, {"id": "38777", "name": "La Porchetta Mentone", "rep": "Brad Armstrong"}, {"id": "37372", "name": "La Roche", "rep": "Brad Armstrong"}, {"id": "37562", "name": "Lakeside Banquet and Convention Centre", "rep": "Gaby McIntosh"}, {"id": "36258", "name": "Lakeside Lara", "rep": "Gaby McIntosh"}, {"id": "37713", "name": "Le Bar", "rep": "Brad Armstrong"}, {"id": "37621", "name": "Leenas Bar and bottle O", "rep": "Angelo Giacobbe"}, {"id": "37582", "name": "Lennox Wine Bar", "rep": "Angelo Giacobbe"}, {"id": "36264", "name": "Lifestyle Communities Geelong", "rep": "Gaby McIntosh"}, {"id": "37128", "name": "Life’s Too Short", "rep": "Brad Armstrong"}, {"id": "37132", "name": "Limerick Castle Hotel (North Melbourne)", "rep": "Brad Armstrong"}, {"id": "39366", "name": "Liquorland Peel Street", "rep": "Trudi Alcock"}, {"id": "39365", "name": "Liquorland Victoria St", "rep": "Trudi Alcock"}, {"id": "39323", "name": "LL Brighton", "rep": "Martin Kelliher"}, {"id": "39325", "name": "LL Elwood", "rep": "Martin Kelliher"}, {"id": "39341", "name": "LL Frankston (Bayside shopping centre)", "rep": "Martin Kelliher"}, {"id": "39329", "name": "LL Hampton", "rep": "Martin Kelliher"}, {"id": "39339", "name": "LL Karingal Hub", "rep": "Martin Kelliher"}, {"id": "39337", "name": "LL Langwarrin", "rep": "Martin Kelliher"}, {"id": "39316", "name": "LL Nth Brighton", "rep": "Martin Kelliher"}, {"id": "39327", "name": "LL Sandringham", "rep": "Martin Kelliher"}, {"id": "39349", "name": "LL Sorrento", "rep": "Martin Kelliher"}, {"id": "39331", "name": "LL Southland", "rep": "Martin Kelliher"}, {"id": "39321", "name": "LLC (ex Vintage Cellars) Albert Park", "rep": "Martin Kelliher"}, {"id": "39319", "name": "LLC (ex Vintage Cellars) Hampton st. Brighton", "rep": "Martin Kelliher"}, {"id": "39317", "name": "LLC (ex-Vintage Cellars) Brighton", "rep": "Martin Kelliher"}, {"id": "37376", "name": "Loud Mouth Bar", "rep": "Brad Armstrong"}, {"id": "38629", "name": "Lucky Little Dumplings Restaurant & Bar", "rep": "Angelo Giacobbe"}, {"id": "36723", "name": "Lynbrook hotel", "rep": "Martin Kelliher"}, {"id": "36777", "name": "Macelleria Richmond", "rep": "Angelo Giacobbe"}, {"id": "39055", "name": "Made in Casa", "rep": "Angelo Giacobbe"}, {"id": "37639", "name": "Matheson Wine Bar", "rep": "Angelo Giacobbe"}, {"id": "37221", "name": "Max on Hardware", "rep": "Brad Armstrong"}, {"id": "39010", "name": "Mazi", "rep": "Brad Armstrong"}, {"id": "38631", "name": "Mazi Kitchen", "rep": "Angelo Giacobbe"}, {"id": "36265", "name": "McKellar Centre", "rep": "Rob Kinch"}, {"id": "37001", "name": "McMahons (West Melbourne)", "rep": "Brad Armstrong"}, {"id": "37966", "name": "Meat me", "rep": "Angelo Giacobbe"}, {"id": "38818", "name": "Meet Me @ Mary’s / The Aborist", "rep": "Gaby McIntosh"}, {"id": "38334", "name": "Melbourne bowling club", "rep": "Martin Kelliher"}, {"id": "35889", "name": "Melbourne Tartan Festival", "rep": "Jason O’Brien"}, {"id": "37551", "name": "Mentone Bowling Club", "rep": "Brad Armstrong"}, {"id": "38964", "name": "Mentone Life Saving Club", "rep": "Brad Armstrong"}, {"id": "37614", "name": "Merchant Beaumaris", "rep": "Brad Armstrong"}, {"id": "37017", "name": "Mesa Verde", "rep": "Brad Armstrong"}, {"id": "37403", "name": "Ministry of Kitchen", "rep": "Martin Kelliher"}, {"id": "36617", "name": "Miss Pickle 1971", "rep": "Rob Kinch"}, {"id": "35851", "name": "Moke Dining", "rep": "Martin Kelliher"}, {"id": "38945", "name": "Monash University Club", "rep": "Martin Kelliher"}, {"id": "35916", "name": "Moonee ponds bowls", "rep": "Jason O’Brien"}, {"id": "37781", "name": "Mornington golf club", "rep": "Martin Kelliher"}, {"id": "36152", "name": "Motor", "rep": "Angelo Giacobbe"}, {"id": "38093", "name": "Mr Bianco", "rep": "Angelo Giacobbe"}, {"id": "38480", "name": "Ms BKK Thai Torquay", "rep": "Leanne Grigg"}, {"id": "36949", "name": "Ms Collins", "rep": "Brad Armstrong"}, {"id": "36871", "name": "Ms Parker", "rep": "Angelo Giacobbe"}, {"id": "39232", "name": "Murrumbeena Wine Bar", "rep": "Angelo Giacobbe"}, {"id": "38012", "name": "Myrtle Wine Bar", "rep": "Brad Armstrong"}, {"id": "37967", "name": "Mythos", "rep": "Angelo Giacobbe"}, {"id": "38871", "name": "Neighbours", "rep": "Brad Armstrong"}, {"id": "37165", "name": "Nepean cellars bottle-o", "rep": "Martin Kelliher"}, {"id": "36628", "name": "Newfolk", "rep": "Rob Kinch"}, {"id": "37416", "name": "North Point Brighton", "rep": "Brad Armstrong"}, {"id": "36647", "name": "O2 Supermarket (IGA)", "rep": "Martin Kelliher"}, {"id": "38048", "name": "Oak & Vine", "rep": "Brad Armstrong"}, {"id": "36736", "name": "Ocha Japanese Restaurant", "rep": "Angelo Giacobbe"}, {"id": "38969", "name": "Olympia Roof top Bar", "rep": "Angelo Giacobbe"}, {"id": "38632", "name": "Our Terroir Bar & Wine Store", "rep": "Angelo Giacobbe"}, {"id": "37667", "name": "Oz Ten Pin Bowling Belmont", "rep": "Gaby McIntosh"}, {"id": "39077", "name": "Palace Hotel East Hawthorn", "rep": "Angelo Giacobbe"}, {"id": "39288", "name": "Palermo CBD", "rep": "Angelo Giacobbe"}, {"id": "38106", "name": "Paper Scissors Rock Brew Co", "rep": "Brad Armstrong"}, {"id": "39040", "name": "Park St IGA X-Press", "rep": "Brad Armstrong"}, {"id": "38239", "name": "Parkers Beach Cafe", "rep": "Brad Armstrong"}, {"id": "39115", "name": "Parkside Wine", "rep": "Angelo Giacobbe"}, {"id": "37390", "name": "Parnham Group", "rep": "Brad Armstrong"}, {"id": "37079", "name": "Patsy’s Wine Bar", "rep": "Brad Armstrong"}, {"id": "36896", "name": "Pine wood Bottlemart", "rep": "Angelo Giacobbe"}, {"id": "39351", "name": "Plonk and Stink", "rep": "Martin Kelliher"}, {"id": "38965", "name": "Port Of Call", "rep": "Brad Armstrong"}, {"id": "38583", "name": "Portsea Celebrity Pro Am", "rep": "Brad Armstrong"}, {"id": "37499", "name": "Postmaster Hotel Kew", "rep": "Angelo Giacobbe"}, {"id": "37289", "name": "Premix King Lucas", "rep": "Trudi Alcock"}, {"id": "37213", "name": "Premix king Wendouree", "rep": "Trudi Alcock"}, {"id": "37564", "name": "Punt Hill Apartments", "rep": "Gaby McIntosh"}, {"id": "38722", "name": "Purple Barrel", "rep": "Martin Kelliher"}, {"id": "36734", "name": "Qantas Wine Club", "rep": "Jason O’Brien"}, {"id": "36779", "name": "Racecourse Hotel Malvern East", "rep": "Angelo Giacobbe"}, {"id": "37752", "name": "Railway hotel windsor", "rep": "Martin Kelliher"}, {"id": "37632", "name": "Receptions at Sapphire", "rep": "Martin Kelliher"}, {"id": "37154", "name": "Reddrops HO", "rep": "Leanne Grigg"}, {"id": "38253", "name": "Reunion Cafe", "rep": "Angelo Giacobbe"}, {"id": "37332", "name": "Rhythm & Tonic", "rep": "Brad Armstrong"}, {"id": "37825", "name": "Richmond Social", "rep": "Angelo Giacobbe"}, {"id": "38478", "name": "Richmond Union Bowls Club", "rep": "Angelo Giacobbe"}, {"id": "37152", "name": "Rickett’s Point Beaumaris", "rep": "Brad Armstrong"}, {"id": "37163", "name": "Ritchies Glenferrie", "rep": "Angelo Giacobbe"}, {"id": "37251", "name": "Ritchies IGA Glenferrie", "rep": "Angelo Giacobbe"}, {"id": "39193", "name": "Robbie's Wine Bar", "rep": "Angelo Giacobbe"}, {"id": "39057", "name": "Roccella Group", "rep": "Brad Armstrong"}, {"id": "36593", "name": "Rococo", "rep": "Rob Kinch"}, {"id": "39018", "name": "Rosalita's Bar & Liquor Store", "rep": "Angelo Giacobbe"}, {"id": "39068", "name": "Roy Hammond", "rep": "Trudi Alcock"}, {"id": "39177", "name": "Royal Melbourne Victorian yacht Club", "rep": "Jason O’Brien"}, {"id": "38068", "name": "Ruby Riviera", "rep": "Brad Armstrong"}, {"id": "38888", "name": "Rutherford Corner", "rep": "Angelo Giacobbe"}, {"id": "38706", "name": "Saigon Today", "rep": "Angelo Giacobbe"}, {"id": "37688", "name": "Sam's Bar and Grill", "rep": "Angelo Giacobbe"}, {"id": "38759", "name": "Samesyn 2.0", "rep": "Leanne Grigg"}, {"id": "37262", "name": "San Domenico", "rep": "Angelo Giacobbe"}, {"id": "38033", "name": "Sapore Blackburn", "rep": "Angelo Giacobbe"}, {"id": "38380", "name": "Saska", "rep": "Brad Armstrong"}, {"id": "38922", "name": "Seme di Fico", "rep": "Angelo Giacobbe"}, {"id": "36881", "name": "Sessions Boutique Liquor Bar", "rep": "Angelo Giacobbe"}, {"id": "37445", "name": "Seul Garden", "rep": "Angelo Giacobbe"}, {"id": "38986", "name": "Side Bar", "rep": "Brad Armstrong"}, {"id": "37939", "name": "Sincero", "rep": "Angelo Giacobbe"}, {"id": "38252", "name": "Sips & Stories", "rep": "Angelo Giacobbe"}, {"id": "37566", "name": "Slices Restaurant", "rep": "Gaby McIntosh"}, {"id": "35841", "name": "Small Patch Wine Store", "rep": "Angelo Giacobbe"}, {"id": "36618", "name": "Soho IGA", "rep": "Rob Kinch"}, {"id": "38801", "name": "Somm wine bar", "rep": "Martin Kelliher"}, {"id": "36396", "name": "Songbird", "rep": "Rob Kinch"}, {"id": "39178", "name": "South Oakleigh Bowling Club", "rep": "Angelo Giacobbe"}, {"id": "37328", "name": "Southern Metropolitan Cemeteries Trust", "rep": "Martin Kelliher"}, {"id": "39037", "name": "Sowl Restaurant", "rep": "Martin Kelliher"}, {"id": "39182", "name": "Spaghetti Club", "rep": "Angelo Giacobbe"}, {"id": "37327", "name": "Speak Easy Fine Liquor", "rep": "Angelo Giacobbe"}, {"id": "39000", "name": "Spicy Wicket", "rep": "Angelo Giacobbe"}, {"id": "37873", "name": "Spirit of Punjab", "rep": "Brad Armstrong"}, {"id": "38326", "name": "Sporting globe", "rep": "Brad Armstrong"}, {"id": "37634", "name": "Springrock Public Bar", "rep": "Brad Armstrong"}, {"id": "37637", "name": "St Germain", "rep": "Angelo Giacobbe"}, {"id": "38987", "name": "St Marks Wine Bar", "rep": "Gaby McIntosh"}, {"id": "36151", "name": "Steel House", "rep": "Angelo Giacobbe"}, {"id": "39140", "name": "Stonnington Sports Centre/ Chadstone Bowling Club", "rep": "Angelo Giacobbe"}, {"id": "38628", "name": "Swatow Cafe", "rep": "Angelo Giacobbe"}, {"id": "35848", "name": "Taku", "rep": "Angelo Giacobbe"}, {"id": "39162", "name": "Tavola", "rep": "Angelo Giacobbe"}, {"id": "39183", "name": "Ten greek plates", "rep": "Martin Kelliher"}, {"id": "38336", "name": "Tesoro Gastronomia", "rep": "Angelo Giacobbe"}, {"id": "38191", "name": "That's Amore Cheese", "rep": "Angelo Giacobbe"}, {"id": "37616", "name": "The Advocate", "rep": "Angelo Giacobbe"}, {"id": "37631", "name": "The Bank", "rep": "Angelo Giacobbe"}, {"id": "37675", "name": "The Barre", "rep": "Brad Armstrong"}, {"id": "36735", "name": "The Beehive Hotel", "rep": "Angelo Giacobbe"}, {"id": "36994", "name": "The Bottom End", "rep": "Brad Armstrong"}, {"id": "38967", "name": "The First Sip", "rep": "Brad Armstrong"}, {"id": "38249", "name": "The Food Republic Cafe", "rep": "Angelo Giacobbe"}, {"id": "37320", "name": "The Foodie Supply", "rep": "Angelo Giacobbe"}, {"id": "35907", "name": "The Fresh Food Merchant", "rep": "Gaby McIntosh"}, {"id": "37446", "name": "The Gardiner Hotel", "rep": "Angelo Giacobbe"}, {"id": "37583", "name": "The Hills Wine Bar", "rep": "Angelo Giacobbe"}, {"id": "36925", "name": "The Irish Times", "rep": "Brad Armstrong"}, {"id": "38062", "name": "The Lady of St Kilda", "rep": "Brad Armstrong"}, {"id": "38749", "name": "The Little Hungarian", "rep": "Angelo Giacobbe"}, {"id": "39333", "name": "The Morang", "rep": "Angelo Giacobbe"}, {"id": "38196", "name": "The Old Garage Cafe", "rep": "Angelo Giacobbe"}, {"id": "36519", "name": "The Other Bar", "rep": "Rob Kinch"}, {"id": "37367", "name": "The Palace Hotel", "rep": "Brad Armstrong"}, {"id": "38921", "name": "The Roe Seafood Restaurant", "rep": "Angelo Giacobbe"}, {"id": "36872", "name": "The Royal pickle club", "rep": "Martin Kelliher"}, {"id": "37300", "name": "The Sandbar", "rep": "Brad Armstrong"}, {"id": "37695", "name": "The Shell Club", "rep": "Gaby McIntosh"}, {"id": "38747", "name": "The Trust", "rep": "Brad Armstrong"}, {"id": "37464", "name": "The Village Grae", "rep": "Angelo Giacobbe"}, {"id": "38840", "name": "The Yarra Hotel", "rep": "Angelo Giacobbe"}, {"id": "38568", "name": "Three Crowns", "rep": "Brad Armstrong"}, {"id": "36892", "name": "Thung Thit Steakhouse", "rep": "Angelo Giacobbe"}, {"id": "39130", "name": "Tigers Clubhouse", "rep": "Gaby McIntosh"}, {"id": "37602", "name": "Tommy Gunn", "rep": "Leanne Grigg"}, {"id": "37118", "name": "Toscano's", "rep": "Angelo Giacobbe"}, {"id": "36721", "name": "Town & Country", "rep": "Angelo Giacobbe"}, {"id": "36811", "name": "Town & Country Pizza Ballarat", "rep": "Rob Kinch"}, {"id": "39027", "name": "Trattoria Emilia CBD", "rep": "Angelo Giacobbe"}, {"id": "36120", "name": "Turn left at Alberquerque", "rep": "Martin Kelliher"}, {"id": "36657", "name": "Union Cellars - Minerva Rd", "rep": "Rob Kinch"}, {"id": "37171", "name": "Urban Alley Brewery", "rep": "Brad Armstrong"}, {"id": "37298", "name": "Ventuno 21", "rep": "Brad Armstrong"}, {"id": "39285", "name": "Victorian Amateur Football Association", "rep": "Martin Kelliher"}, {"id": "37620", "name": "Vine Bottega", "rep": "Brad Armstrong"}, {"id": "39032", "name": "Vintage Bottle", "rep": "Angelo Giacobbe"}, {"id": "38705", "name": "Wagyu Ya", "rep": "Angelo Giacobbe"}, {"id": "36599", "name": "Warragul country club", "rep": "Martin Kelliher"}, {"id": "36601", "name": "Warragul sporting & social club", "rep": "Martin Kelliher"}, {"id": "38320", "name": "Waterfront", "rep": "Brad Armstrong"}, {"id": "37366", "name": "Wayside Inn", "rep": "Brad Armstrong"}, {"id": "38566", "name": "West Beach Pavilion", "rep": "Brad Armstrong"}, {"id": "38013", "name": "Whitehart Bar", "rep": "Brad Armstrong"}, {"id": "38713", "name": "Wine Larder", "rep": "Brad Armstrong"}, {"id": "38720", "name": "Wokaholic", "rep": "Angelo Giacobbe"}, {"id": "38944", "name": "Wokalicious Thai", "rep": "Angelo Giacobbe"}, {"id": "37549", "name": "Wyndham City Civic Centre", "rep": "Gaby McIntosh"}, {"id": "37352", "name": "Young Street Tavern", "rep": "Brad Armstrong"}, {"id": "38251", "name": "Yu & Restaurant", "rep": "Angelo Giacobbe"}, {"id": "37539", "name": "Yuulong", "rep": "Trudi Alcock"}, {"id": "38617", "name": "Zengal Hospitality Group", "rep": "Brad Armstrong"}];
-
 let results = {};
-let paused = false;
-let stopped = false;
-let found = 0;
-let missed = 0;
+let paused = false, stopped = false, found = 0, missed = 0;
 
-// Multiple Nominatim endpoints + CORS proxies as fallback
-const NOMINATIM_ENDPOINTS = [
-  (q) => `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=au&addressdetails=1`,
-  (q) => `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&addressdetails=1`,
-  (q) => `https://nominatim.maps.earth/search?q=${q}&format=json&limit=1&addressdetails=1`,
-];
+// How confident do we need to be to accept a result?
+// We check that at least one meaningful word from the venue name
+// appears in the result's display_name, AND the result is in AU.
+function isConfidentMatch(venueName, hit) {
+  if (!hit) return false;
+
+  const display = (hit.display_name || '').toLowerCase();
+  const country = (hit.address?.country_code || '').toLowerCase();
+
+  // Must be in Australia
+  if (country && country !== 'au') return false;
+  // Must have an actual address type (not a trail, park, waterway etc.)
+  const badTypes = ['trail','track','path','waterway','river','creek','lake','peak','mount','national_park','nature_reserve','heritage','boundary','administrative'];
+  const osmType = (hit.type || hit.class || '').toLowerCase();
+  const cat = (hit.category || '').toLowerCase();
+  if (badTypes.some(t => osmType.includes(t) || cat.includes(t))) return false;
+
+  // Must be a venue/amenity type
+  const goodTypes = ['restaurant','cafe','bar','pub','hotel','motel','nightclub','fast_food',
+    'food_court','leisure','sports_centre','golf_course','bowling_alley','club',
+    'place_of_worship','cinema','theatre','supermarket','convenience','alcohol',
+    'beverages','hostel','guest_house','hospital','school','college'];
+  const isGoodType = goodTypes.some(t => osmType.includes(t) || cat.includes(t));
+
+  // Extract meaningful words from venue name (3+ chars, not common words)
+  const stopWords = new Set(['the','and','bar','pub','hotel','cafe','restaurant',
+    'club','inn','arms','house','at','of','in','&','by','for','a','an']);
+  const venueWords = venueName.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !stopWords.has(w));
+
+  // At least one meaningful word from the venue name must appear in the result
+  const nameMatch = venueWords.length === 0 || venueWords.some(w => display.includes(w));
+
+  return nameMatch && isGoodType;
+}
+
+function parseAddress(hit) {
+  const a = hit.address || {};
+  const num    = a.house_number || '';
+  const road   = a.road || '';
+  const street = num && road ? num + ' ' + road : road;
+  const suburb = a.suburb || a.city_district || a.neighbourhood || a.town || a.village || a.municipality || '';
+  const state  = a.state || '';
+  const post   = a.postcode || '';
+  const parts  = [street, suburb, state, post].filter(Boolean);
+  return parts.length >= 2 ? parts.join(', ') : null;
+}
 
 function logLine(msg, cls) {
   const el = document.getElementById('log');
@@ -123,63 +140,44 @@ function logLine(msg, cls) {
 }
 
 function updateUI(i) {
-  document.getElementById('pbar').style.width = (i / VENUES.length * 100).toFixed(1) + '%';
-  document.getElementById('progText').textContent = i + ' / ' + VENUES.length;
+  document.getElementById('pbar').style.width = (i/VENUES.length*100).toFixed(1)+'%';
+  document.getElementById('progText').textContent = i+' / '+VENUES.length;
   document.getElementById('nFound').textContent = found;
   document.getElementById('nMiss').textContent = missed;
   document.getElementById('nLeft').textContent = VENUES.length - i;
 }
 
-function addTableRow(name, address, rep, ok) {
+function addRow(name, address, rep, ok) {
   const tr = document.createElement('tr');
   tr.innerHTML = `<td>${name}</td><td style="color:${ok?'#065f46':'#9ca3af'}">${address||'—'}</td><td style="font-size:11px;color:#888">${rep}</td><td><span class="badge ${ok?'b-ok':'b-fail'}">${ok?'✓ Found':'✗ Not found'}</span></td>`;
   document.getElementById('tbody').appendChild(tr);
 }
 
-function parseAddress(hit) {
-  if (!hit) return null;
-  const a = hit.address || {};
-  const num    = a.house_number || '';
-  const road   = a.road || '';
-  const street = num && road ? num + ' ' + road : road;
-  const suburb = a.suburb || a.city_district || a.neighbourhood || a.town || a.village || a.municipality || '';
-  const state  = a.state || '';
-  const post   = a.postcode || '';
-  const parts  = [street, suburb, state, post].filter(Boolean);
-  // Need at least suburb + state to be useful
-  if (!suburb && !road) return null;
-  return parts.length >= 2 ? parts.join(', ') : null;
+async function searchNominatim(query) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=3&countrycodes=au&addressdetails=1`;
+    const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!resp.ok) return [];
+    return await resp.json();
+  } catch { return []; }
 }
 
-async function nominatimSearch(name) {
-  // Try each search variant
+async function lookupVenue(name) {
+  // Try progressively broader queries, but only accept confident matches
   const queries = [
-    encodeURIComponent(name + ', Victoria, Australia'),
-    encodeURIComponent(name + ', Australia'),
-    encodeURIComponent(name + ' Melbourne'),
+    name + ' Victoria Australia',
+    name + ' Australia',
   ];
 
   for (const q of queries) {
-    for (const endpointFn of NOMINATIM_ENDPOINTS) {
-      try {
-        const url = endpointFn(q);
-        // No custom User-Agent — browsers block it, just use default
-        const resp = await fetch(url, { 
-          method: 'GET',
-          headers: { 'Accept': 'application/json' }
-        });
-        if (!resp.ok) continue;
-        const data = await resp.json();
-        if (!data || !data.length) continue;
-        const addr = parseAddress(data[0]);
+    const hits = await searchNominatim(q);
+    for (const hit of hits) {
+      if (isConfidentMatch(name, hit)) {
+        const addr = parseAddress(hit);
         if (addr) return addr;
-      } catch(e) {
-        // Try next endpoint
-        continue;
       }
     }
-    // Small gap between query variants
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 400));
   }
   return null;
 }
@@ -191,47 +189,33 @@ async function startLookup() {
   document.getElementById('log').innerHTML = '';
   paused = false; stopped = false; found = 0; missed = 0;
 
-  logLine('Starting lookup for ' + VENUES.length + ' venues…', 'info');
-  logLine('Using OpenStreetMap Nominatim — 1 per second rate limit.', 'info');
-
-  // Quick connectivity test first
+  logLine('Testing connection to Nominatim…', 'info');
   try {
-    const test = await fetch('https://nominatim.openstreetmap.org/search?q=Melbourne+Victoria+Australia&format=json&limit=1');
-    if (test.ok) {
-      logLine('✓ Nominatim connection OK', 'ok');
-    } else {
-      logLine('⚠ Nominatim returned ' + test.status + ' — results may be limited', 'warn');
-    }
-  } catch(e) {
-    logLine('✗ Cannot reach Nominatim: ' + e.message, 'fail');
-    logLine('Try opening this page from a different browser or network.', 'warn');
-  }
+    const test = await fetch('https://nominatim.openstreetmap.org/search?q=Melbourne+Australia&format=json&limit=1');
+    logLine(test.ok ? '✓ Connected to Nominatim OK' : '⚠ Nominatim returned '+test.status, test.ok?'ok':'warn');
+  } catch(e) { logLine('✗ Cannot reach Nominatim: '+e.message, 'fail'); }
+
+  logLine('Starting — only accepting high-confidence matches…', 'info');
 
   for (let i = 0; i < VENUES.length; i++) {
     while (paused && !stopped) await new Promise(r => setTimeout(r, 300));
-    if (stopped) { logLine('⏹ Stopped at ' + i + ' venues.', 'warn'); break; }
+    if (stopped) { logLine('⏹ Stopped at '+i+'.', 'warn'); break; }
 
     const v = VENUES[i];
     updateUI(i);
 
-    const addr = await nominatimSearch(v.name);
+    const addr = await lookupVenue(v.name);
     results[v.name] = { id: v.id, rep: v.rep, address: addr || '' };
 
-    if (addr) {
-      found++;
-      logLine('✓ ' + v.name + ' → ' + addr, 'ok');
-    } else {
-      missed++;
-      logLine('✗ ' + v.name, 'fail');
-    }
+    if (addr) { found++; logLine('✓ '+v.name+' → '+addr, 'ok'); }
+    else       { missed++; logLine('✗ '+v.name, 'fail'); }
 
-    addTableRow(v.name, addr, v.rep, !!addr);
-    updateUI(i + 1);
-
+    addRow(v.name, addr, v.rep, !!addr);
+    updateUI(i+1);
     await new Promise(r => setTimeout(r, 1100));
   }
 
-  logLine('✅ Complete! Found: ' + found + '   Not found: ' + missed, 'info');
+  logLine('✅ Done! Found: '+found+'   Not found: '+missed, 'info');
   document.getElementById('dlBtn').disabled = false;
   document.getElementById('startBtn').disabled = false;
 }
@@ -242,17 +226,14 @@ function togglePause() {
   logLine(paused ? '⏸ Paused.' : '▶ Resumed.', 'warn');
 }
 
-function stopLookup() {
-  stopped = true; paused = false;
-  document.getElementById('dlBtn').disabled = false;
-}
+function stopLookup() { stopped = true; paused = false; document.getElementById('dlBtn').disabled = false; }
 
 function downloadCSV() {
   const rows = [['Internal ID','Name','Address','Sales Rep']];
   for (const [name, d] of Object.entries(results)) {
     rows.push([d.id, name, d.address, d.rep]);
   }
-  const csv = rows.map(r => r.map(c => '"' + String(c||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const csv = rows.map(r => r.map(c => '"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
   a.download = 'venue_addresses.csv';
