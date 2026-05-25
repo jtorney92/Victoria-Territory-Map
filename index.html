@@ -69,6 +69,29 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
 .inline-edit-row { display:flex; gap:6px; margin-bottom:6px; align-items:center; }
 .inline-edit-row label { font-size:11px; color:#aaa; width:70px; flex-shrink:0; }
 #venue-controls { padding:0 16px 10px; flex-shrink:0; display:none; }
+#leads-panel { -webkit-overflow-scrolling:touch; }
+.lead-section-title { font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#888;padding:12px 16px 4px;font-weight:600; }
+.lead-card { margin:4px 8px;background:#0f3460;border-radius:8px;padding:10px 12px;cursor:pointer;border:1px solid transparent;transition:border-color .15s; }
+.lead-card:hover { border-color:#e94560; }
+.lead-card .lc-name { font-size:13px;font-weight:600;color:#e0e0e0;margin-bottom:3px; }
+.lead-card .lc-meta { font-size:11px;color:#888;display:flex;gap:8px;flex-wrap:wrap; }
+.lead-card .lc-status { font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500; }
+.s-lead { background:#1a3a6e;color:#90caf9; }
+.s-prospect { background:#1b3a1b;color:#81c784; }
+.s-unassigned { background:#3a1a1a;color:#ef9a9a; }
+.lead-actions { margin-top:8px;display:flex;gap:6px;flex-wrap:wrap; }
+.la-btn { font-size:11px;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-weight:500; }
+.la-claim { background:#e94560;color:white; }
+.la-transfer { background:#0f3460;color:#90caf9;border:1px solid #1a3a6e; }
+.la-addr { background:#1b3a1b;color:#81c784;border:1px solid #2e7d32; }
+.no-leads { padding:32px 16px;text-align:center;color:#555;font-size:13px; }
+.leads-filter-bar { display:flex;gap:6px;padding:8px 16px;border-bottom:1px solid #0f3460;flex-shrink:0; }
+.lf-btn { font-size:11px;padding:4px 12px;border-radius:12px;border:1px solid #1a3a6e;background:transparent;color:#888;cursor:pointer; }
+.lf-btn.active { background:#e94560;color:white;border-color:#e94560; }
+.addr-input-wrap { margin-top:8px;display:flex;gap:6px; }
+.addr-input-wrap input { flex:1;background:#16213e;border:1px solid #1a3a6e;color:white;border-radius:6px;padding:5px 8px;font-size:12px; }
+.addr-input-wrap input::placeholder { color:#555; }
+.addr-input-wrap button { background:#2e7d32;color:white;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap; }
 #venue-btn { width:100%; padding:8px; background:#1a4a80; color:#eee; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; margin-bottom:6px; }
 #venue-btn:hover { background:#2060a0; }
 #venue-btn:disabled { background:#333; color:#666; cursor:default; }
@@ -138,6 +161,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   <div id="mode-bar">
     <button class="mode-btn active" id="btn-view-mode" onclick="setMode('view')">👁 View</button>
     <button class="mode-btn" id="btn-edit-mode" onclick="setMode('edit')">✏️ Edit</button>
+    <button class="mode-btn" id="btn-leads-mode" onclick="setMode('leads')" style="position:relative">📋 Leads<span id="leads-badge" style="display:none;position:absolute;top:4px;right:4px;background:#e94560;color:white;border-radius:50%;width:14px;height:14px;font-size:9px;line-height:14px;text-align:center;font-weight:700"></span></button>
   </div>
 
   <div id="legend">
@@ -145,12 +169,23 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
     <div id="rep-list"></div>
   </div>
 
+  <div id="rep-selector-bar" style="padding:10px 16px;border-bottom:1px solid #0f3460;flex-shrink:0;display:flex;align-items:center;gap:8px">
+    <span style="font-size:11px;color:#888;white-space:nowrap">You are:</span>
+    <select id="rep-selector" style="flex:1;background:#0f3460;color:white;border:1px solid #1a3a6e;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer" onchange="onRepChange()">
+      <option value="">— Select your name —</option>
+    </select>
+  </div>
+
   <div id="view-panel">
-    <div class="placeholder">🖱 Hover a suburb to preview<br>Click to pin &amp; edit</div>
+    <div class="placeholder">👆 Tap a suburb to lock &amp; view<br><span style="font-size:11px;color:#555">Tap again to unlock</span></div>
   </div>
 
   <div id="edit-panel">
     <div class="ep-placeholder" style="color:#555;font-size:13px;text-align:center;margin-top:40px">✏️ Click any suburb on the map<br>to edit its details</div>
+  </div>
+
+  <div id="leads-panel" style="display:none;padding:0;flex:1;overflow-y:auto">
+    <!-- rendered by renderLeadsPanel() -->
   </div>
 
   <div id="venue-controls">
@@ -763,6 +798,242 @@ loadGeoJSON().then(geojson => {
     <p>Could not fetch suburb boundaries. Check your internet connection.</p>
     <button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#e94560;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">↺ Retry</button>`;
 });
+
+// ── LEADS & PROSPECTS SYSTEM ────────────────────────────────────────────────
+// Placeholder data — will be replaced when CSV is uploaded
+let LEADS_DATA = [];
+let currentRep = localStorage.getItem('currentRep') || '';
+let leadsFilter = 'mine'; // 'mine' | 'pool' | 'all'
+
+const KNOWN_REPS = Object.keys(REP_COLORS);
+
+function initRepSelector() {
+  const sel = document.getElementById('rep-selector');
+  KNOWN_REPS.forEach(rep => {
+    const opt = document.createElement('option');
+    opt.value = rep;
+    opt.textContent = rep;
+    if (rep === currentRep) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  updateLeadsBadge();
+}
+
+function onRepChange() {
+  currentRep = document.getElementById('rep-selector').value;
+  localStorage.setItem('currentRep', currentRep);
+  updateLeadsBadge();
+  if (currentMode === 'leads') renderLeadsPanel();
+}
+
+function updateLeadsBadge() {
+  const badge = document.getElementById('leads-badge');
+  const mine = getLeadsForRep(currentRep).length;
+  const pool = LEADS_DATA.filter(l => l.isPool).length;
+  const total = mine + pool;
+  if (total > 0) {
+    badge.textContent = total > 99 ? '99+' : total;
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function getLeadsForRep(rep) {
+  return LEADS_DATA.filter(l => !l.isPool && l.rep === rep);
+}
+
+function getPoolLeads() {
+  return LEADS_DATA.filter(l => l.isPool);
+}
+
+function renderLeadsPanel() {
+  document.getElementById('btn-leads-mode').classList.add('active');
+  document.getElementById('btn-view-mode').classList.remove('active');
+  document.getElementById('btn-edit-mode').classList.remove('active');
+
+  const panel = document.getElementById('leads-panel');
+
+  if (!currentRep) {
+    panel.innerHTML = '<div class="no-leads">👆 Select your name above to see your leads</div>';
+    return;
+  }
+
+  const mine  = getLeadsForRep(currentRep);
+  const pool  = getPoolLeads();
+  const all   = leadsFilter === 'mine' ? mine : leadsFilter === 'pool' ? pool : [...mine, ...pool];
+
+  let html = `<div class="leads-filter-bar">
+    <button class="lf-btn ${leadsFilter==='mine'?'active':''}" onclick="setLeadsFilter('mine')">My Leads (${mine.length})</button>
+    <button class="lf-btn ${leadsFilter==='pool'?'active':''}" onclick="setLeadsFilter('pool')">🔓 Unassigned Pool (${pool.length})</button>
+    <button class="lf-btn ${leadsFilter==='all'?'active':''}" onclick="setLeadsFilter('all')">All (${mine.length+pool.length})</button>
+  </div>`;
+
+  if (!all.length) {
+    html += `<div class="no-leads">${leadsFilter==='mine'?'No leads assigned to you yet.<br><small style="color:#444">Check the Unassigned Pool!</small>':'No leads in this category.'}</div>`;
+    panel.innerHTML = html;
+    return;
+  }
+
+  // Group by suburb
+  const bySuburb = {};
+  all.forEach(l => {
+    const s = l.suburb || l.address || 'No suburb yet';
+    (bySuburb[s] = bySuburb[s] || []).push(l);
+  });
+
+  Object.entries(bySuburb).sort().forEach(([suburb, leads]) => {
+    html += `<div class="lead-section-title">📍 ${suburb}</div>`;
+    leads.forEach(l => {
+      const statusCls = l.isPool ? 's-unassigned' : l.status === 'Prospect' ? 's-prospect' : 's-lead';
+      const statusLabel = l.isPool ? 'Unassigned' : l.status || 'Lead';
+      html += `<div class="lead-card" id="lc-${l.id}">
+        <div class="lc-name">${l.name}</div>
+        <div class="lc-meta">
+          <span class="lc-status ${statusCls}">${statusLabel}</span>
+          ${l.rep && !l.isPool ? `<span>👤 ${l.rep}</span>` : ''}
+          ${l.address ? `<span>📍 ${l.address}</span>` : '<span style="color:#555">No address yet</span>'}
+        </div>
+        <div class="lead-actions">
+          ${l.isPool ? `<button class="la-btn la-claim" onclick="claimLead('${l.id}')">✋ Claim for me</button>` : ''}
+          ${!l.isPool ? `<button class="la-btn la-transfer" onclick="showTransfer('${l.id}')">↔ Transfer</button>` : ''}
+          ${!l.address ? `<button class="la-btn la-addr" onclick="showAddressInput('${l.id}')">📍 Add address</button>` : ''}
+          ${l.address && l.lat ? `<button class="la-btn" style="background:#0f3460;color:#90caf9;border:1px solid #1a3a6e" onclick="zoomToLead(${l.lat},${l.lng})">🗺 Show on map</button>` : ''}
+        </div>
+        <div id="extra-${l.id}"></div>
+      </div>`;
+    });
+  });
+
+  panel.innerHTML = html;
+}
+
+function setLeadsFilter(f) {
+  leadsFilter = f;
+  renderLeadsPanel();
+}
+
+function claimLead(id) {
+  if (!currentRep) { alert('Please select your name first.'); return; }
+  const lead = LEADS_DATA.find(l => l.id === id);
+  if (!lead) return;
+  lead.rep = currentRep;
+  lead.isPool = false;
+  saveleads();
+  updateLeadsBadge();
+  renderLeadsPanel();
+  refreshLeadPins();
+}
+
+function showTransfer(id) {
+  const extra = document.getElementById('extra-' + id);
+  if (extra.querySelector('.transfer-wrap')) { extra.innerHTML = ''; return; }
+  const opts = KNOWN_REPS.filter(r => r !== currentRep).map(r => `<option value="${r}">${r}</option>`).join('');
+  extra.innerHTML = `<div class="transfer-wrap" style="margin-top:8px;display:flex;gap:6px">
+    <select style="flex:1;background:#0f3460;color:white;border:1px solid #1a3a6e;border-radius:6px;padding:5px 8px;font-size:12px">
+      <option value="">Transfer to…</option>${opts}
+    </select>
+    <button class="la-btn la-claim" onclick="doTransfer('${id}',this.previousElementSibling.value)">Transfer</button>
+  </div>`;
+}
+
+function doTransfer(id, toRep) {
+  if (!toRep) { alert('Please select a rep.'); return; }
+  const lead = LEADS_DATA.find(l => l.id === id);
+  if (!lead) return;
+  lead.rep = toRep;
+  lead.isPool = false;
+  saveleads();
+  updateLeadsBadge();
+  renderLeadsPanel();
+}
+
+function showAddressInput(id) {
+  const extra = document.getElementById('extra-' + id);
+  if (extra.querySelector('.addr-input-wrap')) { extra.innerHTML = ''; return; }
+  extra.innerHTML = `<div class="addr-input-wrap">
+    <input type="text" placeholder="Enter street address, suburb, state, postcode" id="ainput-${id}"/>
+    <button onclick="saveLeadAddress('${id}')">Save</button>
+  </div>`;
+  document.getElementById('ainput-' + id).focus();
+}
+
+async function saveLeadAddress(id) {
+  const input = document.getElementById('ainput-' + id);
+  const addr = input ? input.value.trim() : '';
+  if (!addr) return;
+  const lead = LEADS_DATA.find(l => l.id === id);
+  if (!lead) return;
+  lead.address = addr;
+
+  // Try to geocode to get lat/lng for map pin
+  try {
+    const q = encodeURIComponent(addr + ' Australia');
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&addressdetails=1`);
+    const geo = await r.json();
+    if (geo.length) {
+      lead.lat = parseFloat(geo[0].lat);
+      lead.lng = parseFloat(geo[0].lon);
+      const a = geo[0].address || {};
+      lead.suburb = a.suburb || a.town || a.village || a.city_district || '';
+    }
+  } catch(e) {}
+
+  saveleads();
+  renderLeadsPanel();
+  refreshLeadPins();
+}
+
+function zoomToLead(lat, lng) {
+  map.setView([lat, lng], 15);
+  setMode('view');
+}
+
+// ── Lead pins on map ─────────────────────────────────────────────────────────
+let leadMarkers = [];
+
+function refreshLeadPins() {
+  leadMarkers.forEach(m => map.removeLayer(m));
+  leadMarkers = [];
+  LEADS_DATA.forEach(l => {
+    if (!l.lat || !l.lng) return;
+    const color = l.isPool ? '#f44336' : (REP_COLORS[l.rep] || '#FF9800');
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer" title="${l.name}"></div>`,
+      iconSize: [14, 14], iconAnchor: [7, 7]
+    });
+    const marker = L.marker([l.lat, l.lng], { icon }).addTo(map);
+    marker.bindPopup(`
+      <div style="font-family:sans-serif;min-width:160px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px">${l.name}</div>
+        <div style="font-size:11px;color:#888;margin-bottom:4px">${l.address || 'No address'}</div>
+        <div style="font-size:11px"><b>Rep:</b> ${l.isPool ? '<span style="color:#f44336">Unassigned</span>' : (l.rep || '—')}</div>
+        <div style="font-size:11px"><b>Status:</b> ${l.status || 'Lead'}</div>
+        ${l.isPool && currentRep ? `<button onclick="claimLead('${l.id}');this.closest('.leaflet-popup').querySelector('.leaflet-popup-close-button').click()" style="margin-top:8px;background:#e94560;color:white;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;width:100%">✋ Claim for me</button>` : ''}
+      </div>
+    `);
+    leadMarkers.push(marker);
+  });
+}
+
+// ── Persist leads to localStorage ────────────────────────────────────────────
+function saveleads() {
+  try { localStorage.setItem('leadsData', JSON.stringify(LEADS_DATA)); } catch(e) {}
+}
+
+function loadLeads() {
+  try {
+    const saved = localStorage.getItem('leadsData');
+    if (saved) LEADS_DATA = JSON.parse(saved);
+  } catch(e) {}
+}
+
+// Init
+loadLeads();
+initRepSelector();
+updateLeadsBadge();
+
 </script>
 </body>
 </html>
