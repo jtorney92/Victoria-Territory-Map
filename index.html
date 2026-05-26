@@ -135,9 +135,50 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   .stat-pill { font-size: 10px; padding: 2px 6px; }
   #venue-controls button { font-size: 11px; padding: 6px; }
 }
+
+/* Welcome modal */
+#welcome-overlay {
+  position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;
+  display:flex;align-items:center;justify-content:center;padding:16px;
+}
+#welcome-modal {
+  background:#16213e;border-radius:14px;padding:32px 28px;max-width:380px;width:100%;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #0f3460;text-align:center;
+}
+#welcome-modal h2 { font-size:20px;color:#fff;margin-bottom:6px; }
+#welcome-modal p  { font-size:13px;color:#888;margin-bottom:24px;line-height:1.5; }
+#welcome-rep-select {
+  width:100%;background:#0f3460;color:white;border:1px solid #1a3a6e;
+  border-radius:8px;padding:10px 12px;font-size:14px;cursor:pointer;margin-bottom:16px;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
+}
+#welcome-rep-select:focus { outline:none;border-color:#e94560; }
+#welcome-confirm {
+  width:100%;padding:11px;background:#e94560;color:white;border:none;
+  border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s;
+}
+#welcome-confirm:hover { background:#c73652; }
+#welcome-confirm:disabled { opacity:0.4;cursor:not-allowed; }
+.welcome-logo { font-size:36px;margin-bottom:12px; }
+
 </style>
 </head>
 <body>
+
+
+<div id="welcome-overlay">
+  <div id="welcome-modal">
+    <div class="welcome-logo">🗺</div>
+    <h2>Victoria Territory Map</h2>
+    <p>Select your name to personalise the map and see your leads &amp; prospects.</p>
+    <select id="welcome-rep-select" onchange="document.getElementById('welcome-confirm').disabled=!this.value">
+      <option value="">— Who are you? —</option>
+    </select>
+    <button id="welcome-confirm" onclick="confirmWelcome()" disabled>Let's go →</button>
+  </div>
+</div>
 
 <div id="loader">
   <div class="spinner"></div>
@@ -808,14 +849,47 @@ let leadsFilter = 'mine'; // 'mine' | 'pool' | 'all'
 const KNOWN_REPS = Object.keys(REP_COLORS);
 
 function initRepSelector() {
+  const allReps = ['Administrator', ...KNOWN_REPS];
+
+  // Populate sidebar selector
   const sel = document.getElementById('rep-selector');
-  KNOWN_REPS.forEach(rep => {
+  allReps.forEach(rep => {
     const opt = document.createElement('option');
     opt.value = rep;
-    opt.textContent = rep;
+    opt.textContent = rep === 'Administrator' ? '👑 Administrator (you)' : rep;
     if (rep === currentRep) opt.selected = true;
     sel.appendChild(opt);
   });
+
+  // Populate welcome modal selector
+  const wSel = document.getElementById('welcome-rep-select');
+  allReps.forEach(rep => {
+    const opt = document.createElement('option');
+    opt.value = rep;
+    opt.textContent = rep === 'Administrator' ? '👑 Administrator' : rep;
+    wSel.appendChild(opt);
+  });
+
+  // Show welcome modal if no rep stored, otherwise skip straight in
+  if (currentRep) {
+    document.getElementById('welcome-overlay').style.display = 'none';
+    // Pre-select in modal too
+    wSel.value = currentRep;
+  } else {
+    document.getElementById('welcome-overlay').style.display = 'flex';
+  }
+
+  updateLeadsBadge();
+}
+
+function confirmWelcome() {
+  const sel = document.getElementById('welcome-rep-select');
+  if (!sel.value) return;
+  currentRep = sel.value;
+  localStorage.setItem('currentRep', currentRep);
+  document.getElementById('welcome-overlay').style.display = 'none';
+  // Sync sidebar selector
+  document.getElementById('rep-selector').value = currentRep;
   updateLeadsBadge();
 }
 
