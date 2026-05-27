@@ -90,31 +90,30 @@ function isConfidentMatch(venueName, hit) {
 
   // Must be in Australia
   if (country && country !== 'au') return false;
-  // Must have an actual address type (not a trail, park, waterway etc.)
-  const badTypes = ['trail','track','path','waterway','river','creek','lake','peak','mount','national_park','nature_reserve','heritage','boundary','administrative'];
+
+  // Must be in Victoria (or no state specified)
+  const state = (hit.address?.state || '').toLowerCase();
+  if (state && state !== 'victoria') return false;
+
+  // Reject obvious non-venues
+  const badTypes = ['trail','track','path','waterway','river','creek','lake','peak','mount','national_park','nature_reserve','boundary'];
   const osmType = (hit.type || hit.class || '').toLowerCase();
   const cat = (hit.category || '').toLowerCase();
   if (badTypes.some(t => osmType.includes(t) || cat.includes(t))) return false;
 
-  // Must be a venue/amenity type
-  const goodTypes = ['restaurant','cafe','bar','pub','hotel','motel','nightclub','fast_food',
-    'food_court','leisure','sports_centre','golf_course','bowling_alley','club',
-    'place_of_worship','cinema','theatre','supermarket','convenience','alcohol',
-    'beverages','hostel','guest_house','hospital','school','college'];
-  const isGoodType = goodTypes.some(t => osmType.includes(t) || cat.includes(t));
+  // Must have a road/street to be a useful address
+  if (!hit.address?.road && !hit.address?.house_number) return false;
 
-  // Extract meaningful words from venue name (3+ chars, not common words)
+  // Extract meaningful words from venue name
   const stopWords = new Set(['the','and','bar','pub','hotel','cafe','restaurant',
-    'club','inn','arms','house','at','of','in','&','by','for','a','an']);
+    'club','inn','arms','house','at','of','in','&','by','for','a','an','new','old']);
   const venueWords = venueName.toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length >= 3 && !stopWords.has(w));
 
-  // At least one meaningful word from the venue name must appear in the result
-  const nameMatch = venueWords.length === 0 || venueWords.some(w => display.includes(w));
-
-  return nameMatch && isGoodType;
+  // At least one meaningful word must appear in the result
+  return venueWords.length === 0 || venueWords.some(w => display.includes(w));
 }
 
 function parseAddress(hit) {
