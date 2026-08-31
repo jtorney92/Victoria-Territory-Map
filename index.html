@@ -1320,16 +1320,15 @@ function exportVenueXLSX() {
   const sortedReps = [...suburbReps].sort((a, b) => (repCustomerCounts[b] || 0) - (repCustomerCounts[a] || 0));
 
   // For each venue, assign the dominant rep (highest customer count in suburb)
-  // If suburb is shared, note all reps but lead with dominant one
+  // If suburb is shared, note it as "Primary (+ others)" in one column rather than separate fields
   const primaryRep = sortedReps[0] || '';
-  const allReps = sortedReps.join(' / ');
   const isShared = sortedReps.length > 1;
+  const repDisplay = isShared ? `${primaryRep} (+ ${sortedReps.slice(1).join(', ')})` : primaryRep;
 
   const headers = [
     'Venue Name', 'Type', 'Cuisine/Category', 'Operator/Brand',
     'Street Address', 'Suburb', 'Postcode',
-    'Primary Rep', 'All Reps', 'Shared Territory',
-    'Existing Customers in Suburb', 'Rep Customer Count',
+    'Rep',
     'Phone', 'Email', 'Website', 'Opening Hours',
     'Google Maps Link'
   ];
@@ -1340,10 +1339,6 @@ function exportVenueXLSX() {
   const sorted = [...filtered].sort((a, b) =>
     a.type.localeCompare(b.type) || a.name.localeCompare(b.name)
   );
-
-  // Get existing customer count for primary rep in this suburb
-  const primaryRepCount = repCustomerCounts[primaryRep] || 0;
-  const totalCustomers = suburbInfo ? suburbInfo.customers.length : 0;
 
   // Extract postcode from address
   function extractPostcode(addr) {
@@ -1368,11 +1363,7 @@ function exportVenueXLSX() {
       extractStreet(v.address),
       extractSuburb(v.address) || v.suburb,
       extractPostcode(v.address),
-      primaryRep,
-      allReps,
-      isShared ? 'Yes' : 'No',
-      totalCustomers,
-      primaryRepCount,
+      repDisplay,
       v.phone || '',
       v.email || '',
       v.website || '',
