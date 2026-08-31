@@ -6,6 +6,7 @@
 <title>Victoria Territory Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; display:flex; height:100vh; overflow:hidden; background:#1a1a2e; color:#eee; }
@@ -108,25 +109,21 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   content:''; position:absolute; width:22px; height:22px;
   border-radius:50% 50% 50% 0; transform:rotate(-45deg);
   top:0; left:3px;
+  background: var(--dot-color, #888); /* colour is set inline per-marker so any venue type works, not just a fixed list */
 }
 .venue-dot::after {
   content:attr(data-emoji); position:absolute; top:1px; left:3px;
   width:22px; height:22px; display:flex; align-items:center;
   justify-content:center; font-size:12px; line-height:22px; text-align:center;
 }
-.venue-dot.restaurant::before { background:#FF6B35; }
-.venue-dot.cafe::before { background:#FFA500; }
-.venue-dot.bar::before { background:#9C27B0; }
-.venue-dot.pub::before { background:#4CAF50; }
-.venue-dot.hotel::before { background:#2196F3; }
-.venue-dot.nightclub::before { background:#E91E63; }
-.venue-dot.bottle-shop::before { background:#00BCD4; }
-.venue-dot.winery::before { background:#8BC34A; }
-.venue-dot.unknown::before { background:#888; }
 #venue-legend { font-size:11px; margin-top:8px; display:none; }
 #venue-legend .leg-item { display:flex; align-items:center; gap:5px; margin:3px 0; cursor:pointer; user-select:none; }
 #venue-legend .leg-item.hidden-type { opacity:0.4; }
 #venue-legend .leg-dot { width:12px; height:12px; border-radius:50%; border:2px solid #fff; flex-shrink:0; }
+#venue-search-wrap { display:none; margin-bottom:6px; }
+#venue-search { width:100%; padding:7px 10px; border-radius:6px; border:1px solid #0f3460; background:#1a1a2e; color:#eee; font-size:12px; outline:none; }
+#venue-search:focus { border-color:#e94560; }
+#venue-search-count { font-size:10px; color:#777; margin-top:3px; }
 
 .venue-popup { font-size:12px; line-height:1.5; min-width:180px; }
 .venue-popup strong { font-size:13px; display:block; margin-bottom:2px; }
@@ -247,7 +244,11 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   <div id="venue-controls">
     <button id="venue-btn" onclick="findVenues()">🔍 Find nearby venues</button>
     <button id="clear-venues-btn" onclick="clearVenues()">✕ Clear venue dots</button>
-    <button id="export-venues-btn" onclick="exportVenueCSV()" style="display:none;width:100%;padding:8px;background:#1b3a1b;color:#81c784;border:1px solid #2e7d32;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:6px">⬇ Export venues CSV</button>
+    <div id="venue-search-wrap">
+      <input id="venue-search" type="text" placeholder="Filter by name, type, cuisine or brand…" oninput="filterVenues(this.value)">
+      <div id="venue-search-count"></div>
+    </div>
+    <button id="export-venues-btn" onclick="exportVenueXLSX()" style="display:none;width:100%;padding:8px;background:#1b3a1b;color:#81c784;border:1px solid #2e7d32;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:6px">⬇ Export venues XLSX</button>
     <div id="venue-legend"></div>
   </div>
 
@@ -612,6 +613,12 @@ function clearVenues() {
   venueMarkers.forEach(m => m.remove());
   venueMarkers = [];
   foundVenueData = [];
+  hiddenTypes.clear();
+  venueSearchTerm = '';
+  const searchInput = document.getElementById('venue-search');
+  if (searchInput) searchInput.value = '';
+  document.getElementById('venue-search-wrap').style.display = 'none';
+  document.getElementById('venue-search-count').textContent = '';
   document.getElementById('clear-venues-btn').style.display = 'none';
   document.getElementById('export-venues-btn').style.display = 'none';
   const btn = document.getElementById('venue-btn');
@@ -620,17 +627,49 @@ function clearVenues() {
 
 const VENUE_COLORS = {
   restaurant:'#FF6B35', cafe:'#FFA500', bar:'#9C27B0', pub:'#4CAF50',
-  hotel:'#2196F3', nightclub:'#E91E63', 'bottle-shop':'#00BCD4', winery:'#8BC34A', unknown:'#888'
+  hotel:'#2196F3', motel:'#2196F3', 'guest-house':'#2196F3',
+  nightclub:'#E91E63', 'bottle-shop':'#00BCD4', winery:'#8BC34A',
+  brewery:'#8BC34A', distillery:'#8BC34A',
+  'golf-course':'#2E7D32', 'sports-centre':'#009688',
+  'fast-food':'#FF7043', 'food-court':'#FF7043', biergarten:'#4CAF50',
+  'community-centre':'#607D8B', 'conference-centre':'#607D8B', 'events-venue':'#607D8B',
+  unknown:'#888'
 };
+// Any type ending in "-club" (tennis club, golf club, bowls club, sailing club, RSL etc.) —
+// there's no fixed list of these since OSM tags them with an open-ended "sport"/"club" value,
+// so it gets a generic club colour/emoji rather than needing a hardcoded entry per sport.
+const CLUB_FALLBACK_COLOR = '#795548';
+const CLUB_FALLBACK_EMOJI = '🏆';
+function colorForType(cssType) {
+  if (VENUE_COLORS[cssType]) return VENUE_COLORS[cssType];
+  if (cssType.endsWith('-club')) return CLUB_FALLBACK_COLOR;
+  return '#888';
+}
+const VENUE_EMOJI = {
+  restaurant:'🍽', cafe:'☕', bar:'🍸', pub:'🍺',
+  hotel:'🏨', motel:'🏨', 'guest-house':'🏨',
+  nightclub:'🎵', 'bottle-shop':'🍷', winery:'🍇',
+  brewery:'🍺', distillery:'🥃',
+  'golf-course':'⛳', 'sports-centre':'🏟',
+  'fast-food':'🍕', 'food-court':'🍜', biergarten:'🍺',
+  'community-centre':'🏛', 'conference-centre':'🏛', 'events-venue':'🎉',
+  unknown:'📍'
+};
+function emojiForType(cssType) {
+  if (VENUE_EMOJI[cssType]) return VENUE_EMOJI[cssType];
+  if (cssType.endsWith('-club')) return CLUB_FALLBACK_EMOJI;
+  return '📍';
+}
 const hiddenTypes = new Set();
+let venueSearchTerm = '';
 
 function buildVenueLegend(typeCounts) {
   const legend = document.getElementById('venue-legend');
   legend.innerHTML = '';
   legend.style.display = 'block';
   Object.entries(typeCounts).forEach(([type, count]) => {
-    const cssType = type.replace(' ', '-');
-    const color = VENUE_COLORS[cssType] || '#888';
+    const cssType = type.replace(/\s+/g, '-');
+    const color = colorForType(cssType);
     const item = document.createElement('div');
     item.className = 'leg-item' + (hiddenTypes.has(cssType) ? ' hidden-type' : '');
     item.dataset.type = cssType;
@@ -648,12 +687,37 @@ function toggleVenueType(cssType, item) {
     hiddenTypes.add(cssType);
     item.classList.add('hidden-type');
   }
+  applyVenueFilters();
+}
+
+// Matches a marker against the current free-text search term (name, type, brand/operator, or cuisine —
+// so typing "pizza" works even though "pizza" is never a venue type itself, just a cuisine tag)
+function venueMarkerMatches(m) {
+  if (!venueSearchTerm) return true;
+  const term = venueSearchTerm.toLowerCase();
+  return (m._venueName && m._venueName.toLowerCase().includes(term)) ||
+         (m._venueType && m._venueType.toLowerCase().includes(term)) ||
+         (m._venueBrand && m._venueBrand.toLowerCase().includes(term)) ||
+         (m._venueCuisine && m._venueCuisine.toLowerCase().includes(term));
+}
+
+// Combines the type toggle (legend clicks) and the search box into one visibility pass
+function applyVenueFilters() {
+  let visibleCount = 0;
   venueMarkers.forEach(m => {
-    if (m._venueType === cssType) {
-      if (hiddenTypes.has(cssType)) map.removeLayer(m);
-      else m.addTo(map);
-    }
+    const visible = !hiddenTypes.has(m._venueType) && venueMarkerMatches(m);
+    if (visible) { m.addTo(map); visibleCount++; }
+    else map.removeLayer(m);
   });
+  const countEl = document.getElementById('venue-search-count');
+  if (countEl) {
+    countEl.textContent = venueSearchTerm ? `${visibleCount} of ${venueMarkers.length} venues match` : '';
+  }
+}
+
+function filterVenues(term) {
+  venueSearchTerm = term || '';
+  applyVenueFilters();
 }
 
 async function findVenues() {
@@ -670,13 +734,21 @@ async function findVenues() {
 
   const query = `[out:json][timeout:25];
 (
-  node["amenity"~"restaurant|cafe|bar|pub|nightclub"](${s},${w},${n},${e});
+  node["amenity"~"restaurant|cafe|bar|pub|nightclub|fast_food|food_court|biergarten|community_centre|conference_centre|events_venue"](${s},${w},${n},${e});
   node["amenity"="bottle_shop"](${s},${w},${n},${e});
-  node["shop"~"alcohol|wine"](${s},${w},${n},${e});
-  node["tourism"="hotel"](${s},${w},${n},${e});
+  node["shop"~"alcohol|wine|deli"](${s},${w},${n},${e});
+  node["tourism"~"hotel|motel|guest_house"](${s},${w},${n},${e});
   node["amenity"="hotel"](${s},${w},${n},${e});
+  node["craft"~"brewery|distillery|winery"](${s},${w},${n},${e});
+  way["craft"~"brewery|distillery|winery"](${s},${w},${n},${e});
+  node["leisure"="golf_course"](${s},${w},${n},${e});
+  way["leisure"="golf_course"](${s},${w},${n},${e});
+  node["leisure"="sports_centre"](${s},${w},${n},${e});
+  way["leisure"="sports_centre"](${s},${w},${n},${e});
+  node["club"](${s},${w},${n},${e});
+  way["club"](${s},${w},${n},${e});
 );
-out body;`;
+out center;`;
 
   try {
     const enc = encodeURIComponent(query);
@@ -706,31 +778,51 @@ out body;`;
     const EXCLUDED_CHAINS = /\b(mcdonald|mcdonalds|kfc|subway|taco bell|hungry jack|hungry jacks|domino|pizza hut|red rooster|oporto|nando|grill'd|guzman|zambrero|roll'd|sushi|sushi hub|boost juice|sumo salad|oporto|lord of the fries|wendy|burger king|popeyes|carl's jr|carls jr|schnitz|oakberry|chatime|gong cha|share tea|starbucks|gloria jeans|tim horton|donut king|krispy kreme|muffin break|bakers delight|brumby|subway|7-eleven|bp|shell|caltex|mobil|bp|woolworth|coles|aldi|iga|costco|dan murphy|liquorland|bws|first choice)\b/i;
 
     elements.forEach(v => {
-      if (!v.lat || !v.lon || !v.tags || !v.tags.name) return;
+      // Ways/relations (golf courses, breweries, sports grounds) return a "center" object instead of lat/lon directly
+      const vlat = v.lat != null ? v.lat : (v.center ? v.center.lat : null);
+      const vlon = v.lon != null ? v.lon : (v.center ? v.center.lon : null);
+      if (vlat == null || vlon == null || !v.tags || !v.tags.name) return;
       if (EXCLUDED_CHAINS.test(v.tags.name)) return; // skip chains
-      const amenity = v.tags.amenity || v.tags.shop || v.tags.tourism || '';
+
+      // rawType is whichever OSM tag actually classified this venue — amenity/shop/tourism/leisure/craft,
+      // or "club" as a last resort (club=* is a broad, open-ended catch-all so we don't need to
+      // hand-pick every possible sport/social club type up front)
+      const rawType = v.tags.amenity || v.tags.shop || v.tags.tourism || v.tags.leisure || v.tags.craft || (v.tags.club ? 'club' : '') || '';
       const typeMap = {
-        restaurant: 'restaurant', cafe: 'cafe', bar: 'bar', pub: 'pub',
-        nightclub: 'nightclub', hotel: 'hotel',
-        bottle_shop: 'bottle shop', alcohol: 'bottle shop', wine: 'bottle shop'
+        restaurant: 'restaurant', cafe: 'cafe', bar: 'bar', pub: 'pub', nightclub: 'nightclub',
+        fast_food: 'fast food', food_court: 'food court', biergarten: 'biergarten',
+        community_centre: 'community centre', conference_centre: 'conference centre', events_venue: 'events venue',
+        hotel: 'hotel', motel: 'motel', guest_house: 'guest house',
+        bottle_shop: 'bottle shop', alcohol: 'bottle shop', wine: 'bottle shop', deli: 'deli',
+        brewery: 'brewery', distillery: 'distillery', winery: 'winery',
+        golf_course: 'golf course', sports_centre: 'sports centre',
+        club: 'club'
       };
-      const type = typeMap[amenity] || 'unknown';
-      const cssType = type.replace(' ', '-');
+      let type = typeMap[rawType] || 'unknown';
+      // Turn a generic "club" into a readable label from whatever sport/club value it actually carries —
+      // this is what makes "tennis club", "bowls club", "sailing club" etc. all work without being hardcoded
+      if (rawType === 'club') {
+        if (v.tags.sport) type = v.tags.sport.split(';')[0].replace(/_/g, ' ') + ' club';
+        else if (v.tags.club && v.tags.club !== 'sport' && v.tags.club !== 'yes') type = v.tags.club.replace(/_/g, ' ') + ' club';
+        else type = 'club';
+      }
+      const cssType = type.replace(/\s+/g, '-');
       const address = [v.tags['addr:housenumber'], v.tags['addr:street']].filter(Boolean).join(' ');
       const venueName = v.tags.name;
-      const emojiMap = {
-        restaurant:'🍽', cafe:'☕', bar:'🍸', pub:'🍺',
-        hotel:'🏨', nightclub:'🎵', 'bottle-shop':'🍷', winery:'🍇', unknown:'📍'
-      };
-      const emoji = emojiMap[cssType] || '📍';
+      const emoji = emojiForType(cssType);
+      const dotColor = colorForType(cssType);
       const icon = L.divIcon({
         className: '',
-        html: `<div class="venue-dot ${cssType}" data-type="${cssType}" data-emoji="${emoji}" title="${venueName}"></div>`,
+        html: `<div class="venue-dot" style="--dot-color:${dotColor}" data-type="${cssType}" data-emoji="${emoji}" title="${venueName}"></div>`,
         iconSize: [28,34], iconAnchor: [14,34],
       });
-      const marker = L.marker([v.lat, v.lon], { icon }).addTo(map);
+      const marker = L.marker([vlat, vlon], { icon }).addTo(map);
       marker._venueType = cssType;
       marker._venueName = venueName;
+      const operator = v.tags['operator'] || v.tags['brand'] || '';
+      const cuisine  = v.tags['cuisine'] || '';
+      marker._venueBrand = operator;
+      marker._venueCuisine = cuisine;
 
       // Build full address from all available OSM fields
       const streetNo = v.tags['addr:housenumber'] || '';
@@ -740,35 +832,35 @@ out body;`;
       const fullAddress = [streetNo && street ? `${streetNo} ${street}` : street, suburb, postcode].filter(Boolean).join(', ');
 
       // Use GPS coords for Maps link — drop a pin at exact location
-      const mapsUrl = `https://maps.google.com/?q=${v.lat},${v.lon}`;
+      const mapsUrl = `https://maps.google.com/?q=${vlat},${vlon}`;
 
       marker.bindPopup(`
         <div class="venue-popup">
           <strong>${venueName}</strong>
-          <span class="vtype">${type}</span>
+          <span class="vtype">${type}${cuisine ? ' · ' + cuisine : ''}</span>
+          ${operator ? `<div style="color:#aaa;font-size:11px;margin-top:2px">Brand: ${operator}</div>` : ''}
           ${fullAddress ? `<div style="color:#aaa;font-size:11px;margin-top:2px">${fullAddress}</div>` : ''}
-          <div style="color:#555;font-size:10px;margin-top:2px">${v.lat.toFixed(5)}, ${v.lon.toFixed(5)}</div>
-          <a href="https://maps.google.com/?q=${v.lat},${v.lon}" target="_blank" style="display:inline-block;margin-top:8px;padding:4px 10px;background:#4285F4;color:#fff;border-radius:4px;font-size:11px;text-decoration:none;">📍 Open in Google Maps</a>
+          <div style="color:#555;font-size:10px;margin-top:2px">${vlat.toFixed(5)}, ${vlon.toFixed(5)}</div>
+          <a href="https://maps.google.com/?q=${vlat},${vlon}" target="_blank" style="display:inline-block;margin-top:8px;padding:4px 10px;background:#4285F4;color:#fff;border-radius:4px;font-size:11px;text-decoration:none;">📍 Open in Google Maps</a>
         </div>`);
       venueMarkers.push(marker);
       typeCounts[type] = (typeCounts[type] || 0) + 1;
       count++;
-      // Store for CSV export
+      // Store for spreadsheet export
       // Capture all available OSM contact/detail fields
       const phone    = v.tags['phone'] || v.tags['contact:phone'] || '';
       const website  = v.tags['website'] || v.tags['contact:website'] || v.tags['url'] || '';
       const email    = v.tags['email'] || v.tags['contact:email'] || '';
       const opening  = v.tags['opening_hours'] || '';
-      const cuisine  = v.tags['cuisine'] || '';
-      const operator = v.tags['operator'] || v.tags['brand'] || '';
 
       foundVenueData.push({
         name: venueName,
         type: type,
+        cssType: cssType,
         address: fullAddress,
         suburb: activeSuburbKey || '',
-        lat: v.lat,
-        lng: v.lon,
+        lat: vlat,
+        lng: vlon,
         mapsUrl: mapsUrl,
         phone, website, email, opening, cuisine, operator,
       });
@@ -777,7 +869,10 @@ out body;`;
     buildVenueLegend(typeCounts);
     btn.textContent = `✓ ${count} venues found`;
     document.getElementById('clear-venues-btn').style.display = 'block';
-    if (count > 0) document.getElementById('export-venues-btn').style.display = 'block';
+    if (count > 0) {
+      document.getElementById('export-venues-btn').style.display = 'block';
+      document.getElementById('venue-search-wrap').style.display = 'block';
+    }
   } catch(err) {
     btn.textContent = '⚠ Failed: ' + err.message;
     btn.disabled = false;
@@ -1189,9 +1284,24 @@ initRepSelector();
 updateLeadsBadge();
 
 
-// ── Export found venues to CSV ────────────────────────────────────────────
-function exportVenueCSV() {
+// ── Export found venues to XLSX ───────────────────────────────────────────
+// Respects whatever is currently visible on the map: legend type toggles + the search box
+function getFilteredVenueData() {
+  const term = (venueSearchTerm || '').toLowerCase();
+  return foundVenueData.filter(v => {
+    if (hiddenTypes.has(v.cssType)) return false;
+    if (!term) return true;
+    return (v.name && v.name.toLowerCase().includes(term)) ||
+           (v.type && v.type.toLowerCase().includes(term)) ||
+           (v.operator && v.operator.toLowerCase().includes(term)) ||
+           (v.cuisine && v.cuisine.toLowerCase().includes(term));
+  });
+}
+
+function exportVenueXLSX() {
   if (!foundVenueData.length) return;
+  const filtered = getFilteredVenueData();
+  if (!filtered.length) { alert('No venues match the current filter — clear the search box or re-enable a hidden type first.'); return; }
 
   // Get rep info for this suburb
   const suburbInfo = activeSuburbKey ? lookup[activeSuburbKey] : null;
@@ -1227,7 +1337,7 @@ function exportVenueCSV() {
   const rows = [headers];
 
   // Sort venues: group by type, then alphabetically within type
-  const sorted = [...foundVenueData].sort((a, b) =>
+  const sorted = [...filtered].sort((a, b) =>
     a.type.localeCompare(b.type) || a.name.localeCompare(b.name)
   );
 
@@ -1271,14 +1381,33 @@ function exportVenueCSV() {
     ]);
   });
 
+  const suburbName = (activeSuburbKey || 'venues').replace(/\s+/g, '_');
+  const dateStamp = new Date().toISOString().slice(0,10);
+
+  // Preferred path: real .xlsx with columns auto-fitted to their content
+  if (typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = headers.map((h, i) => {
+      let max = String(h).length;
+      rows.slice(1).forEach(r => {
+        const len = String(r[i] ?? '').length;
+        if (len > max) max = len;
+      });
+      return { wch: Math.min(Math.max(max + 2, 10), 60) }; // padding, 10 min / 60 max chars wide
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Venues');
+    XLSX.writeFile(wb, 'VenueProspects_' + suburbName + '_' + dateStamp + '.xlsx');
+    return;
+  }
+
+  // Fallback if the XLSX library didn't load (e.g. offline) — plain CSV, no auto-fit
   const csv = rows.map(r =>
     r.map(c => '"' + String(c||'').replace(/"/g, '""') + '"').join(',')
   ).join('\n');
-
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-  const suburbName = (activeSuburbKey || 'venues').replace(/\s+/g, '_');
-  a.download = 'VenueProspects_' + suburbName + '_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.download = 'VenueProspects_' + suburbName + '_' + dateStamp + '.csv';
   a.click();
 }
 
