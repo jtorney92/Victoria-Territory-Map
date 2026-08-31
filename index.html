@@ -754,6 +754,14 @@ out body;`;
       typeCounts[type] = (typeCounts[type] || 0) + 1;
       count++;
       // Store for CSV export
+      // Capture all available OSM contact/detail fields
+      const phone    = v.tags['phone'] || v.tags['contact:phone'] || '';
+      const website  = v.tags['website'] || v.tags['contact:website'] || v.tags['url'] || '';
+      const email    = v.tags['email'] || v.tags['contact:email'] || '';
+      const opening  = v.tags['opening_hours'] || '';
+      const cuisine  = v.tags['cuisine'] || '';
+      const operator = v.tags['operator'] || v.tags['brand'] || '';
+
       foundVenueData.push({
         name: venueName,
         type: type,
@@ -762,6 +770,7 @@ out body;`;
         lat: v.lat,
         lng: v.lon,
         mapsUrl: mapsUrl,
+        phone, website, email, opening, cuisine, operator,
       });
     });
 
@@ -1183,21 +1192,93 @@ updateLeadsBadge();
 // ── Export found venues to CSV ────────────────────────────────────────────
 function exportVenueCSV() {
   if (!foundVenueData.length) return;
-  // Get rep(s) for the active suburb
+
+  // Get rep info for this suburb
   const suburbInfo = activeSuburbKey ? lookup[activeSuburbKey] : null;
-  const repNames = suburbInfo ? suburbInfo.reps.join(' / ') : '';
-  const rows = [['Name', 'Type', 'Address', 'Suburb', 'Rep(s)', 'Latitude', 'Longitude', 'Google Maps']];
-  foundVenueData.forEach(v => {
+  const suburbReps = suburbInfo ? suburbInfo.reps : [];
+
+  // Work out the dominant rep by customer count in this suburb
+  // Use customer count to weight — rep with most customers listed first
+  const repCustomerCounts = {};
+  if (suburbInfo) {
+    suburbInfo.customers.forEach(c => {
+      const r = c.rep || (suburbReps[0] || '');
+      repCustomerCounts[r] = (repCustomerCounts[r] || 0) + 1;
+    });
+  }
+  // Sort reps by customer count descending
+  const sortedReps = [...suburbReps].sort((a, b) => (repCustomerCounts[b] || 0) - (repCustomerCounts[a] || 0));
+
+  // For each venue, assign the dominant rep (highest customer count in suburb)
+  // If suburb is shared, note all reps but lead with dominant one
+  const primaryRep = sortedReps[0] || '';
+  const allReps = sortedReps.join(' / ');
+  const isShared = sortedReps.length > 1;
+
+  const headers = [
+    'Venue Name', 'Type', 'Cuisine/Category', 'Operator/Brand',
+    'Street Address', 'Suburb', 'Postcode',
+    'Primary Rep', 'All Reps', 'Shared Territory',
+    'Existing Customers in Suburb', 'Rep Customer Count',
+    'Phone', 'Email', 'Website', 'Opening Hours',
+    'Google Maps Link'
+  ];
+
+  const rows = [headers];
+
+  // Sort venues: group by type, then alphabetically within type
+  const sorted = [...foundVenueData].sort((a, b) =>
+    a.type.localeCompare(b.type) || a.name.localeCompare(b.name)
+  );
+
+  // Get existing customer count for primary rep in this suburb
+  const primaryRepCount = repCustomerCounts[primaryRep] || 0;
+  const totalCustomers = suburbInfo ? suburbInfo.customers.length : 0;
+
+  // Extract postcode from address
+  function extractPostcode(addr) {
+    const m = addr.match(/\b(3\d{3})\b/);
+    return m ? m[1] : '';
+  }
+  function extractStreet(addr) {
+    // Remove postcode and suburb-level parts
+    return addr.split(',')[0] || addr;
+  }
+  function extractSuburb(addr) {
+    const parts = addr.split(',');
+    return parts.length >= 2 ? parts[parts.length - 2].trim().replace(/\s*(VIC|NSW|QLD|SA|WA)\s*/i, '').trim() : '';
+  }
+
+  sorted.forEach(v => {
     rows.push([
-      v.name, v.type, v.address, v.suburb, repNames,
-      v.lat.toFixed(5), v.lng.toFixed(5), v.mapsUrl
+      v.name,
+      v.type.charAt(0).toUpperCase() + v.type.slice(1).replace(/-/g, ' '),
+      v.cuisine || '',
+      v.operator || '',
+      extractStreet(v.address),
+      extractSuburb(v.address) || v.suburb,
+      extractPostcode(v.address),
+      primaryRep,
+      allReps,
+      isShared ? 'Yes' : 'No',
+      totalCustomers,
+      primaryRepCount,
+      v.phone || '',
+      v.email || '',
+      v.website || '',
+      v.opening || '',
+      v.mapsUrl,
     ]);
   });
-  const csv = rows.map(r => r.map(c => '"' + String(c||'').replace(/"/g, '""') + '"').join(',')).join('\n');
+
+  const csv = rows.map(r =>
+    r.map(c => '"' + String(c||'').replace(/"/g, '""') + '"').join(',')
+  ).join('\n');
+
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
   const suburbName = (activeSuburbKey || 'venues').replace(/\s+/g, '_');
-  a.download = suburbName + '_nearby_venues.csv';
+  a.download = 'VenueProspects_' + suburbName + '_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
 }
 
