@@ -295,8 +295,8 @@ let lookup = buildLookup();
 
 // ── MAP ───────────────────────────────────────────────────────────────────────
 const map = L.map('map', { center: [-37.0, 144.5], zoom: 7 });
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution:'© OpenStreetMap contributors © CARTO', subdomains:'abcd', maxZoom:19
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  attribution:'© Esri © OpenStreetMap contributors', maxZoom:16
 }).addTo(map);
 
 function repColor(rep) { return REP_COLORS[rep] || '#888'; }
