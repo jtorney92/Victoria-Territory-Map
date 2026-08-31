@@ -1183,10 +1183,13 @@ updateLeadsBadge();
 // ── Export found venues to CSV ────────────────────────────────────────────
 function exportVenueCSV() {
   if (!foundVenueData.length) return;
-  const rows = [['Name', 'Type', 'Address', 'Suburb', 'Latitude', 'Longitude', 'Google Maps']];
+  // Get rep(s) for the active suburb
+  const suburbInfo = activeSuburbKey ? lookup[activeSuburbKey] : null;
+  const repNames = suburbInfo ? suburbInfo.reps.join(' / ') : '';
+  const rows = [['Name', 'Type', 'Address', 'Suburb', 'Rep(s)', 'Latitude', 'Longitude', 'Google Maps']];
   foundVenueData.forEach(v => {
     rows.push([
-      v.name, v.type, v.address, v.suburb,
+      v.name, v.type, v.address, v.suburb, repNames,
       v.lat.toFixed(5), v.lng.toFixed(5), v.mapsUrl
     ]);
   });
