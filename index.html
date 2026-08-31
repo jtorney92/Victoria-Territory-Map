@@ -139,13 +139,31 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
 #loader p { color:#aaa; font-size:13px; text-align:center; max-width:300px; }
 .spinner { width:40px; height:40px; border:3px solid #0f3460; border-top-color:#e94560; border-radius:50%; animation:spin 0.8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
-@media (max-width: 600px) {
-  body { flex-direction: column-reverse; }
-  #sidebar { width: 100% !important; min-width: unset !important; height: 45vh; border-left: none; border-top: 2px solid #e94560; }
-  #map { height: 55vh; }
+/* Tablet */
+@media (min-width: 601px) and (max-width: 1024px) {
+  #sidebar { width: 270px !important; min-width: 270px !important; }
   #sidebar-header h1 { font-size: 13px; }
   .stat-pill { font-size: 10px; padding: 2px 6px; }
-  #venue-controls button { font-size: 11px; padding: 6px; }
+}
+/* Mobile (portrait) */
+@media (max-width: 600px) {
+  body { flex-direction: column; }
+  #map { height: 50vh; flex-shrink: 0; }
+  #sidebar { width: 100% !important; min-width: unset !important; height: 50vh;
+    border-left: none; border-top: 2px solid #e94560; overflow: hidden;
+    display: flex; flex-direction: column; }
+  #sidebar-scroll { flex: 1; overflow-y: scroll; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  #sidebar-header h1 { font-size: 13px; }
+  .stat-pill { font-size: 10px; padding: 2px 6px; }
+  #venue-controls { padding: 10px 12px; }
+  #venue-controls button { font-size: 12px; padding: 10px; width: 100%; margin-bottom: 6px; display: block; }
+  .mode-btn { font-size: 11px; padding: 7px 4px; }
+  .lead-card { margin: 4px 6px; }
+  #welcome-modal { padding: 24px 18px; }
+}
+/* iPhone notch / safe area */
+@supports (padding-top: env(safe-area-inset-top)) {
+  #sidebar-header { padding-top: calc(14px + env(safe-area-inset-top)); }
 }
 
 /* Welcome modal */
@@ -192,6 +210,72 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   </div>
 </div>
 
+
+<!-- Guide Modal -->
+<div id="guide-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99998;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#16213e;border-radius:14px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid #0f3460">
+    <div style="padding:20px 24px;border-bottom:1px solid #0f3460;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#16213e;z-index:1">
+      <h2 style="color:#e94560;font-size:16px;margin:0">📖 Quick Start Guide</h2>
+      <button onclick="toggleGuide()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <div style="padding:20px 24px;font-size:13px;color:#ccc;line-height:1.7">
+      <p style="color:#aaa;margin-bottom:16px">Interactive map of Victoria for the Scotchmans Hill sales team.</p>
+
+      <div style="margin-bottom:18px">
+        <div style="color:#e94560;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">1. Pick your name</div>
+        <p>First time you open it, select your name from the dropdown at the top of the sidebar. The map remembers it on your device.</p>
+      </div>
+
+      <div style="margin-bottom:18px">
+        <div style="color:#e94560;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">2. Get your bearings</div>
+        <ul style="margin:0;padding-left:18px">
+          <li>Each suburb is shaded by the rep who covers it</li>
+          <li>Hover a suburb to preview it</li>
+          <li>Click a suburb to lock it &mdash; full details appear in the panel. Click again to unlock</li>
+          <li>Use the search box to jump to a suburb or customer by name</li>
+        </ul>
+      </div>
+
+      <div style="margin-bottom:18px">
+        <div style="color:#e94560;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">3. The three tabs</div>
+        <ul style="margin:0;padding-left:18px">
+          <li><strong style="color:#fff">View</strong> &mdash; see who covers a suburb and the customers in it</li>
+          <li><strong style="color:#fff">Edit</strong> &mdash; reassign a suburb or edit customer details (click a suburb first)</li>
+          <li><strong style="color:#fff">Leads</strong> &mdash; your prospect leads. Unclaimed ones sit in the shared pool. Click "Claim" to take one on</li>
+        </ul>
+      </div>
+
+      <div style="margin-bottom:18px">
+        <div style="color:#e94560;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">4. Finding new venues</div>
+        <ol style="margin:0;padding-left:18px">
+          <li>Click a suburb to lock it in</li>
+          <li>Click <strong style="color:#fff">Find nearby venues</strong></li>
+          <li>Coloured pins appear &mdash; click any for details, phone, website, and a Google Maps link</li>
+          <li>Use the legend to hide/show venue types</li>
+          <li>Use the search box to filter by name, type, cuisine or brand</li>
+          <li>Click <strong style="color:#fff">Export venues XLSX</strong> to download what's visible</li>
+        </ol>
+      </div>
+
+      <div style="margin-bottom:18px">
+        <div style="color:#e94560;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">5. Marker shapes</div>
+        <ul style="margin:0;padding-left:18px">
+          <li>&#9670; Diamond = Lead</li>
+          <li>&#9650; Triangle = Prospect</li>
+          <li>&#9679; Circle = Unassigned pool</li>
+        </ul>
+      </div>
+
+      <div style="background:#0f3460;border-radius:8px;padding:12px 14px;font-size:12px;color:#90caf9">
+        <strong>Tips</strong><br>
+        If things look broken, try Ctrl+Shift+R (hard refresh).<br>
+        Your name is saved per device &mdash; switch devices and you'll need to pick again.<br>
+        Venue finder data comes from OpenStreetMap &mdash; smaller venues may not always appear.
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="loader">
   <div class="spinner"></div>
   <h2>Loading Territory Map</h2>
@@ -201,7 +285,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
 <div id="map"></div>
 
 <div id="sidebar">
-  <div id="sidebar-header">
+  <div id="sidebar-header" style="display:flex;align-items:flex-start;justify-content:space-between">
     <h1>🗺 Victoria Territory Map</h1>
     <div id="stats-line"><span class="stat-pill">Loading…</span></div>
     <div id="search-wrap">
@@ -220,6 +304,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   <div id="legend">
     <h3>Sales Reps <small style="font-size:10px;font-weight:normal;color:#555">(click to toggle)</small></h3>
     <div id="rep-list"></div>
+    <button onclick="toggleGuide()" title="Help & Guide" style="background:none;border:1px solid #1a3a6e;color:#90caf9;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;flex-shrink:0;margin-top:2px;line-height:24px;text-align:center">?</button>
   </div>
 
   <div id="rep-selector-bar" style="padding:10px 16px;border-bottom:1px solid #0f3460;flex-shrink:0;display:flex;align-items:center;gap:8px">
@@ -751,19 +836,52 @@ async function findVenues() {
 out center;`;
 
   try {
-    const enc = encodeURIComponent(query);
-    const endpoints = [
-      'https://overpass-api.de/api/interpreter?data=' + enc,
-      'https://overpass.kumi.systems/api/interpreter?data=' + enc,
-      'https://maps.mail.ru/osm/tools/overpass/api/interpreter?data=' + enc,
-    ];
-    let resp = null;
-    for (const ep of endpoints) {
-      try { resp = await fetch(ep); if (resp.ok) break; } catch(e) { resp = null; }
+    // Google Places Text Search — more current and complete than OSM
+    const GKEY = 'AIzaSyAC_hfg9hd5nkMHNXCTg3wmu04Mpnmgu5o';
+    const centre = { latitude: (s+n)/2, longitude: (w+e)/2 };
+    const radiusM = Math.max((n-s)*111320, (e-w)*111320*Math.cos(centre.latitude*Math.PI/180)) * 0.7;
+    const CHAIN_RE = /\b(mcdonald|kfc|subway|taco bell|hungry jack|domino|pizza hut|red rooster|oporto|nando|grill.?d|lord of the fries|starbucks|gloria jean|7-eleven|bp |caltex|woolworths|coles|aldi|costco)\b/i;
+    const seenIds = new Set();
+    const rawPlaces = [];
+    // Search multiple types so we get full coverage
+    for (const qTerm of ['restaurant','cafe bar pub','hotel nightclub','bottle shop wine','brewery winery']) {
+      try {
+        const gResp = await fetch('https://places.googleapis.com/v1/places:searchText', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'X-Goog-Api-Key': GKEY,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.nationalPhoneNumber,places.websiteUri,places.regularOpeningHours,places.primaryType,places.primaryTypeDisplayName' },
+          body: JSON.stringify({ textQuery: qTerm + ' ' + venueSuburbKey + ' Victoria Australia', locationBias: { circle: { center: centre, radius: Math.max(radiusM, 500) } }, maxResultCount: 20 }),
+        });
+        if (gResp.ok) {
+          const gData = await gResp.json();
+          for (const p of (gData.places || [])) {
+            if (seenIds.has(p.id)) continue;
+            seenIds.add(p.id);
+            const plat = p.location?.latitude, plng = p.location?.longitude;
+            if (!plat || plat < s-0.005 || plat > n+0.005 || plng < w-0.005 || plng > e+0.005) continue;
+            if (CHAIN_RE.test(p.displayName?.text || '')) continue;
+            rawPlaces.push(p);
+          }
+        }
+        await new Promise(r => setTimeout(r, 150));
+      } catch(e) { /* continue */ }
     }
-    if (!resp || !resp.ok) throw new Error('Venue search unavailable — try again shortly');
-    const data = await resp.json();
-    const elements = data.elements || [];
+    // Convert to OSM-compatible element format our existing code understands
+    const elements = rawPlaces.map(p => ({
+      lat: p.location.latitude,
+      lon: p.location.longitude,
+      tags: {
+        name: p.displayName?.text || '',
+        phone: p.nationalPhoneNumber || '',
+        website: p.websiteUri || '',
+        opening_hours: p.regularOpeningHours?.weekdayDescriptions?.join(' | ') || '',
+        amenity: (p.primaryType||'').replace(/_/g,' '),
+        cuisine: '',
+        operator: '',
+        _googleType: p.primaryType || '',
+        _googleTypeDisplay: p.primaryTypeDisplayName?.text || '',
+      }
+    }));
 
     if (!elements.length) {
       btn.textContent = '⚠ No venues found';
@@ -776,6 +894,16 @@ out center;`;
     const typeCounts = {};
     // Filter out fast food chains we don't want
     const EXCLUDED_CHAINS = /\b(mcdonald|mcdonalds|kfc|subway|taco bell|hungry jack|hungry jacks|domino|pizza hut|red rooster|oporto|nando|grill'd|guzman|zambrero|roll'd|sushi|sushi hub|boost juice|sumo salad|oporto|lord of the fries|wendy|burger king|popeyes|carl's jr|carls jr|schnitz|oakberry|chatime|gong cha|share tea|starbucks|gloria jeans|tim horton|donut king|krispy kreme|muffin break|bakers delight|brumby|subway|7-eleven|bp|shell|caltex|mobil|bp|woolworth|coles|aldi|iga|costco|dan murphy|liquorland|bws|first choice)\b/i;
+
+    // Google → display type mapping
+    const googleTypeMap = {
+      'restaurant':'restaurant','cafe':'cafe','bar':'bar','night_club':'nightclub',
+      'pub':'pub','lodging':'hotel','hotel':'hotel','motel':'hotel',
+      'liquor_store':'bottle-shop','wine_store':'bottle-shop',
+      'winery':'winery','brewery':'winery',
+      'golf_course':'sports','sports_club':'sports','bowling_alley':'sports',
+      'food':'restaurant','meal_takeaway':'restaurant',
+    };
 
     elements.forEach(v => {
       // Ways/relations (golf courses, breweries, sports grounds) return a "center" object instead of lat/lon directly
@@ -1401,6 +1529,56 @@ function exportVenueXLSX() {
   a.download = 'VenueProspects_' + suburbName + '_' + dateStamp + '.csv';
   a.click();
 }
+
+
+// ── Guide modal ────────────────────────────────────────────────────────────
+function toggleGuide() {
+  const el = document.getElementById('guide-overlay');
+  el.style.display = el.style.display === 'none' || !el.style.display ? 'flex' : 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('guide-overlay').style.display = 'none'; } });
+
+
+// ── Firebase real-time sync (shared lead state) ────────────────────────────
+// Using Firebase Realtime Database free tier — all reps see each other's changes
+const FIREBASE_URL = 'https://scotchmans-territory-map-default-rtdb.firebaseio.com';
+
+async function syncLeadsToFirebase() {
+  try {
+    await fetch(FIREBASE_URL + '/leads.json', {
+      method: 'PUT',
+      body: JSON.stringify(LEADS_DATA),
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch(e) { /* offline — saved locally only */ }
+}
+
+async function loadLeadsFromFirebase() {
+  try {
+    const r = await fetch(FIREBASE_URL + '/leads.json');
+    if (r.ok) {
+      const data = await r.json();
+      if (data && Array.isArray(data) && data.length > 0) {
+        LEADS_DATA = data;
+        updateLeadsBadge();
+        if (currentMode === 'leads') renderLeadsPanel();
+        refreshLeadPins(null);
+      }
+    }
+  } catch(e) { /* use local data */ }
+}
+
+// Patch saveleads to also sync to Firebase
+const _origSaveLeads = saveleads;
+function saveleads() {
+  _origSaveLeads();
+  syncLeadsToFirebase();
+}
+
+// Poll for changes every 30 seconds
+setInterval(loadLeadsFromFirebase, 30000);
+// Load on startup
+setTimeout(loadLeadsFromFirebase, 2000);
 
 </script>
 </body>
