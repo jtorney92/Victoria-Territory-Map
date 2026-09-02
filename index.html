@@ -11,7 +11,7 @@
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; display:flex; height:100vh; overflow:hidden; background:#1a1a2e; color:#eee; }
 #map { flex:1; }
-#sidebar { width:300px; min-width:300px; background:#16213e; display:flex; flex-direction:column; border-left:1px solid #0f3460; overflow:hidden; }
+#sidebar { width:300px; min-width:300px; background:#16213e; display:flex; flex-direction:column; border-left:1px solid #0f3460; overflow:hidden; position:relative; }
 #sidebar-header { padding:14px 16px; background:#0f3460; border-bottom:1px solid #1a1a2e; flex-shrink:0; }
 #sidebar-header h1 { font-size:15px; font-weight:700; color:#e94560; margin-bottom:4px; }
 .stat-pill { display:inline-block; background:#1a1a2e; padding:2px 8px; border-radius:10px; font-size:11px; color:#aaa; margin-right:4px; margin-top:4px; }
@@ -193,6 +193,38 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
 #welcome-confirm:disabled { opacity:0.4;cursor:not-allowed; }
 .welcome-logo { font-size:36px;margin-bottom:12px; }
 
+
+/* Guide button — fixed bottom of sidebar */
+#guide-pill {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: #0f3460;
+  border: 1px solid #1a3a6e;
+  color: #90caf9;
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  z-index: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: background .15s;
+}
+#guide-pill:hover { background: #1a4a80; }
+
+
+.customer-tip {
+  background: #1a1a2e;
+  border: 1px solid #0f3460;
+  color: #eee;
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.customer-tip::before { display: none; }
+
 </style>
 </head>
 <body>
@@ -285,7 +317,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
 <div id="map"></div>
 
 <div id="sidebar">
-  <div id="sidebar-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+  <div id="sidebar-header">
     <h1>🗺 Victoria Territory Map</h1>
     <div id="stats-line"><span class="stat-pill">Loading…</span></div>
     <div id="search-wrap">
@@ -304,7 +336,6 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   <div id="legend">
     <h3>Sales Reps <small style="font-size:10px;font-weight:normal;color:#555">(click to toggle)</small></h3>
     <div id="rep-list"></div>
-    <button onclick="toggleGuide()" title="Help & Guide" style="background:none;border:1px solid #1a3a6e;color:#90caf9;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;flex-shrink:0;margin-top:2px;line-height:24px;text-align:center">?</button>
   </div>
 
   <div id="rep-selector-bar" style="padding:10px 16px;border-bottom:1px solid #0f3460;flex-shrink:0;display:flex;align-items:center;gap:8px">
@@ -343,7 +374,9 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
     <button id="btn-discard" onclick="discardChanges()">Discard</button>
     <button id="btn-download" onclick="downloadMap()">💾 Download Updated Map</button>
   </div>
-</div>
+
+
+  <button id="guide-pill" onclick="toggleGuide()" title="Open the Quick Start Guide">📖 Quick Start Guide</button></div>
 
 
 
@@ -425,7 +458,8 @@ function setMode(mode) {
 }
 
 // ── VIEW PANEL ────────────────────────────────────────────────────────────────
-function renderViewPanel(info) {
+function renderViewPanel(info, key) {
+  key = key || activeSuburbKey;
   const panel = document.getElementById('view-panel');
   const isShared = info.reps.length > 1;
   const byRep = {};
@@ -441,7 +475,7 @@ function renderViewPanel(info) {
     const custs = byRep[rep] || [];
     if (isShared && custs.length) html += `<div style="font-size:11px;color:${repColor(rep) === '#FFFFFF' ? '#aaa' : repColor(rep)};font-weight:600;margin:8px 0 4px">${rep}</div>`;
     for (const c of custs) {
-      html += `<div class="customer-item">${c.name}${c.topSale ? `<div class="top-sale">⭐ ${c.topSale}</div>` : ''}</div>`;
+      html += `<div class="customer-item" onclick="locateCustomer('${key}')" style="cursor:pointer" title="Click to locate on map">${c.name} <span style='color:#555;font-size:10px'>↗</span></div>`;
     }
   }
   panel.innerHTML = html;
@@ -1042,7 +1076,7 @@ loadGeoJSON().then(geojson => {
 
       layer.on('mouseover', () => {
         if (selectedLayer) return;
-        if (info) { layer.setStyle(styleFor(info, true, false)); renderViewPanel(info); }
+        if (info) { layer.setStyle(styleFor(info, true, false)); renderViewPanel(info, key); showCustomerDots(key, info); }
         else {
           layer.setStyle({ fillColor:'#aaa', fillOpacity:0.3, color:'#fff', weight:1.5 });
           document.getElementById('view-panel').innerHTML = `<h2>${raw}</h2><div class="placeholder" style="margin-top:12px">No customers in this suburb</div>`;
@@ -1053,6 +1087,7 @@ loadGeoJSON().then(geojson => {
 
       layer.on('mouseout', () => {
         if (selectedLayer) return;
+        clearCustomerDots();
         if (info) layer.setStyle(styleFor(info, false, false));
         else layer.setStyle({ fillColor:'#333', fillOpacity:0.15, color:'#555', weight:0.5, opacity:0.5 });
         clearViewPanel();
@@ -1082,7 +1117,7 @@ loadGeoJSON().then(geojson => {
           else layer.setStyle({ fillColor:'#aaa', fillOpacity:0.4, color:'#fff', weight:2 });
           showVenueButton(key);
           setMode('view');
-          if (info) renderViewPanel(info);
+          if (info) renderViewPanel(info, key);
           else document.getElementById('view-panel').innerHTML = `<h2>${raw}</h2><div class="placeholder" style="margin-top:12px">No customers yet.<br>Switch to Edit tab to add one.</div>`;
         }
       });
@@ -1579,6 +1614,60 @@ function saveleads() {
 setInterval(loadLeadsFromFirebase, 30000);
 // Load on startup
 setTimeout(loadLeadsFromFirebase, 2000);
+
+
+// ── Customer locate & dots ─────────────────────────────────────────────────
+let customerDots = [];
+
+function locateCustomer(suburbKey) {
+  // Zoom to the suburb centroid
+  const layer = allLayers[suburbKey];
+  if (!layer) return;
+  const bounds = layer.getBounds();
+  const centre = bounds.getCenter();
+  map.setView(centre, Math.max(map.getZoom(), 14), { animate: true });
+  // Flash the suburb highlight
+  layer.setStyle({ fillOpacity: 0.5, weight: 3 });
+  setTimeout(() => {
+    const info = lookup[suburbKey];
+    if (info) layer.setStyle(styleFor(info, false, true));
+  }, 600);
+}
+
+function showCustomerDots(suburbKey, info) {
+  // Clear existing customer dots
+  clearCustomerDots();
+  if (!info || !info.customers.length) return;
+  const layer = allLayers[suburbKey];
+  if (!layer) return;
+
+  const bounds = layer.getBounds();
+  const cLat = (bounds.getNorth() + bounds.getSouth()) / 2;
+  const cLng = (bounds.getEast() + bounds.getWest()) / 2;
+  const latSpread = (bounds.getNorth() - bounds.getSouth()) * 0.3;
+  const lngSpread = (bounds.getEast() - bounds.getWest()) * 0.3;
+
+  info.customers.forEach((c, i) => {
+    const angle = (i / info.customers.length) * 2 * Math.PI;
+    const radius = 0.3 + (i % 3) * 0.3; // vary radius for readability
+    const lat = cLat + Math.sin(angle) * latSpread * radius;
+    const lng = cLng + Math.cos(angle) * lngSpread * radius;
+    const col = repColor(c.rep) || '#888';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:9px;height:9px;border-radius:50%;background:${col};border:1.5px solid rgba(255,255,255,0.8);box-shadow:0 1px 3px rgba(0,0,0,0.4)" title="${c.name}"></div>`,
+      iconSize: [9,9], iconAnchor: [4,4]
+    });
+    const marker = L.marker([lat, lng], { icon, interactive: true }).addTo(map);
+    marker.bindTooltip(c.name, { permanent: false, direction: 'top', offset: [0,-6], className: 'customer-tip' });
+    customerDots.push(marker);
+  });
+}
+
+function clearCustomerDots() {
+  customerDots.forEach(m => map.removeLayer(m));
+  customerDots = [];
+}
 
 </script>
 </body>
