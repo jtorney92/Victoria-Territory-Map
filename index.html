@@ -451,6 +451,11 @@ function setMode(mode) {
   document.getElementById('btn-edit-mode').classList.toggle('active', mode === 'edit');
   document.getElementById('view-panel').style.display = mode === 'view' ? 'block' : 'none';
   document.getElementById('edit-panel').style.display = mode === 'edit' ? 'block' : 'none';
+  // Re-show customer dots when switching back to View on a locked suburb
+  if (mode === 'view' && activeSuburbKey) {
+    const info = lookup[activeSuburbKey];
+    if (info) showCustomerDots(activeSuburbKey, info);
+  }
   if (mode === 'edit') {
     if (activeSuburbKey) renderEditPanel(activeSuburbKey);
     else document.getElementById('edit-panel').innerHTML = '<div class="ep-placeholder" style="color:#555;font-size:13px;text-align:center;margin-top:40px">✏️ Click a suburb on the map first</div>';
@@ -1076,6 +1081,8 @@ loadGeoJSON().then(geojson => {
 
       layer.on('mouseover', () => {
         if (selectedLayer) return;
+        // Cancel any pending clear from previous mouseout
+        clearTimeout(clearDotsTimeout);
         if (info) { layer.setStyle(styleFor(info, true, false)); renderViewPanel(info, key); showCustomerDots(key, info); }
         else {
           layer.setStyle({ fillColor:'#aaa', fillOpacity:0.3, color:'#fff', weight:1.5 });
@@ -1087,10 +1094,14 @@ loadGeoJSON().then(geojson => {
 
       layer.on('mouseout', () => {
         if (selectedLayer) return;
-        clearCustomerDots();
         if (info) layer.setStyle(styleFor(info, false, false));
         else layer.setStyle({ fillColor:'#333', fillOpacity:0.15, color:'#555', weight:0.5, opacity:0.5 });
-        clearViewPanel();
+        // Delay before clearing view panel (dots stay — always on)
+        clearDotsTimeout = setTimeout(() => {
+          if (!selectedLayer) {
+            clearViewPanel();
+          }
+        }, 400);
       });
 
       layer.on('click', (e) => {
@@ -1134,6 +1145,16 @@ loadGeoJSON().then(geojson => {
     `<span class="stat-pill">${totalCustomers} customers</span><span class="stat-pill">${mappedCount} suburbs</span><span class="stat-pill">${Object.keys(REP_COLORS).length} reps</span>`;
 
   if (geoLayer.getBounds().isValid()) map.fitBounds(geoLayer.getBounds(), { padding:[20,20] });
+  // Draw all customer dots once GeoJSON is ready
+  setTimeout(drawAllCustomerDots, 800);
+
+  // Clear dots when clicking empty map area
+  map.on('click', () => {
+    if (!selectedLayer) {
+      clearTimeout(clearDotsTimeout);
+      clearViewPanel();
+    }
+  });
   // Drop prospect pins after map loads
   setTimeout(refreshLeadPins, 800);
 
@@ -1618,6 +1639,7 @@ setTimeout(loadLeadsFromFirebase, 2000);
 
 // ── Customer locate & dots ─────────────────────────────────────────────────
 let customerDots = [];
+let clearDotsTimeout = null;
 
 function locateCustomer(suburbKey) {
   // Zoom to the suburb centroid
@@ -1634,39 +1656,49 @@ function locateCustomer(suburbKey) {
   }, 600);
 }
 
-function showCustomerDots(suburbKey, info) {
-  // Clear existing customer dots
-  clearCustomerDots();
-  if (!info || !info.customers.length) return;
-  const layer = allLayers[suburbKey];
-  if (!layer) return;
+// Dots are always-on via drawAllCustomerDots — these are kept for compatibility
+function showCustomerDots(suburbKey, info) {}
+function clearCustomerDots() {}
 
-  const bounds = layer.getBounds();
-  const cLat = (bounds.getNorth() + bounds.getSouth()) / 2;
-  const cLng = (bounds.getEast() + bounds.getWest()) / 2;
-  const latSpread = (bounds.getNorth() - bounds.getSouth()) * 0.3;
-  const lngSpread = (bounds.getEast() - bounds.getWest()) * 0.3;
 
-  info.customers.forEach((c, i) => {
-    const angle = (i / info.customers.length) * 2 * Math.PI;
-    const radius = 0.3 + (i % 3) * 0.3; // vary radius for readability
-    const lat = cLat + Math.sin(angle) * latSpread * radius;
-    const lng = cLng + Math.cos(angle) * lngSpread * radius;
-    const col = repColor(c.rep) || '#888';
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="width:9px;height:9px;border-radius:50%;background:${col};border:1.5px solid rgba(255,255,255,0.8);box-shadow:0 1px 3px rgba(0,0,0,0.4)" title="${c.name}"></div>`,
-      iconSize: [9,9], iconAnchor: [4,4]
+// ── Customer dots — always visible on map ─────────────────────────────────
+function drawAllCustomerDots() {
+  // Remove any existing
+  if (window._custDots) window._custDots.forEach(m => map.removeLayer(m));
+  window._custDots = [];
+
+  Object.entries(lookup).forEach(([key, info]) => {
+    if (!info.customers || !info.customers.length) return;
+    const layer = allLayers[key];
+    if (!layer) return;
+
+    const bounds = layer.getBounds();
+    const cLat = (bounds.getNorth() + bounds.getSouth()) / 2;
+    const cLng = (bounds.getEast() + bounds.getWest()) / 2;
+    const latSpread = (bounds.getNorth() - bounds.getSouth()) * 0.35;
+    const lngSpread = (bounds.getEast() - bounds.getWest()) * 0.35;
+
+    info.customers.forEach((c, i) => {
+      const angle = (i / Math.max(info.customers.length, 1)) * 2 * Math.PI;
+      const ring = Math.floor(i / 8);
+      const radiusFactor = 0.2 + ring * 0.25;
+      const lat = cLat + Math.sin(angle) * latSpread * radiusFactor;
+      const lng = cLng + Math.cos(angle) * lngSpread * radiusFactor;
+      const col = repColor(c.rep) || '#888';
+      const icon = L.divIcon({
+        className: '',
+        html: '<div style="width:8px;height:8px;border-radius:50%;background:' + col + ';border:1.5px solid rgba(255,255,255,0.75);box-shadow:0 1px 3px rgba(0,0,0,0.5);cursor:pointer"></div>',
+        iconSize: [8,8], iconAnchor: [4,4]
+      });
+      const marker = L.marker([lat, lng], { icon, interactive: true, zIndexOffset: -100 }).addTo(map);
+      marker.bindTooltip('<strong>' + c.name + '</strong><br><small style="color:#aaa">' + (info.displayName || key) + '</small>', {
+        permanent: false, direction: 'top', offset: [0,-6], className: 'customer-tip'
+      });
+      marker.on('click', (e) => { L.DomEvent.stopPropagation(e); locateCustomer(key); });
+      window._custDots.push(marker);
     });
-    const marker = L.marker([lat, lng], { icon, interactive: true }).addTo(map);
-    marker.bindTooltip(c.name, { permanent: false, direction: 'top', offset: [0,-6], className: 'customer-tip' });
-    customerDots.push(marker);
   });
-}
-
-function clearCustomerDots() {
-  customerDots.forEach(m => map.removeLayer(m));
-  customerDots = [];
+  console.log('Customer dots drawn:', window._custDots.length);
 }
 
 </script>
