@@ -208,15 +208,16 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
 .customer-tip::before { display: none; }
 
 
-/* Collapsible guide tab — fixed to right of screen */
+/* Collapsible guide tab — fixed to LEFT side (map side, not sidebar) */
 #guide-tab {
   position: fixed;
-  right: 0;
+  left: 0;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2000;
   display: flex;
   align-items: stretch;
+  flex-direction: row;
 }
 #guide-tab-label {
   writing-mode: vertical-rl;
@@ -228,12 +229,13 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   font-weight: 700;
   padding: 12px 6px;
   cursor: pointer;
-  border-radius: 6px 0 0 6px;
+  border-radius: 0 6px 6px 0;
   letter-spacing: .05em;
   user-select: none;
-  box-shadow: -2px 0 8px rgba(0,0,0,0.3);
+  box-shadow: 2px 0 8px rgba(0,0,0,0.3);
   transition: background .15s;
   white-space: nowrap;
+  order: 2;
 }
 #guide-tab-label:hover { background: #c73652; }
 #guide-tab-content {
@@ -242,9 +244,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   transition: width .25s ease;
   background: #16213e;
   border: 1px solid #0f3460;
-  border-right: none;
-  border-radius: 8px 0 0 8px;
-  box-shadow: -4px 0 16px rgba(0,0,0,0.4);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 4px 0 16px rgba(0,0,0,0.4);
+  order: 1;
 }
 #guide-tab:hover #guide-tab-content,
 #guide-tab.open #guide-tab-content {
