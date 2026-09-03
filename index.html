@@ -591,12 +591,41 @@ async function loadAllData() {
 
 // ── Immediate init — only needs inline data (REP_COLORS) ─────────────────
 // Called before JSON files load so the welcome modal has rep options
+// Populate rep dropdowns immediately — REP_COLORS is inline so always available
 (function immediateInit() {
   try {
-    initRepSelector();
-    loadLeads();          // load any saved leads from localStorage
+    const allReps = ['Administrator', ...Object.keys(REP_COLORS)].sort((a,b) => a === 'Administrator' ? -1 : a.localeCompare(b));
+    // Populate welcome modal
+    const wSel = document.getElementById('welcome-rep-select');
+    if (wSel && wSel.options.length <= 1) {
+      allReps.forEach(rep => {
+        const opt = document.createElement('option');
+        opt.value = rep;
+        opt.textContent = rep === 'Administrator' ? '👑 Administrator' : rep;
+        wSel.appendChild(opt);
+      });
+    }
+    // Populate sidebar selector
+    const sSel = document.getElementById('rep-selector');
+    if (sSel && sSel.options.length <= 1) {
+      allReps.forEach(rep => {
+        const opt = document.createElement('option');
+        opt.value = rep;
+        opt.textContent = rep === 'Administrator' ? '👑 Administrator (you)' : rep;
+        if (rep === currentRep) opt.selected = true;
+        sSel.appendChild(opt);
+      });
+    }
+    // Show welcome modal or skip if rep already saved
+    if (currentRep) {
+      const overlay = document.getElementById('welcome-overlay');
+      if (overlay) overlay.style.display = 'none';
+      if (wSel) wSel.value = currentRep;
+      if (sSel) sSel.value = currentRep;
+    }
+    loadLeads();
     updateLeadsBadge();
-  } catch(e) { /* REP_COLORS not ready yet — will retry in Promise.all */ }
+  } catch(e) { console.error('immediateInit error:', e); }
 })();
 
 const map = L.map('map', { center: [-37.0, 144.5], zoom: 7 });
@@ -1334,10 +1363,11 @@ Promise.all([loadAllData(), loadGeoJSON()]).then(([dataOk, geojson]) => {
   updateStats();
   buildLegend();
   buildRepFilterBtns();
-  // Re-run initRepSelector in case it ran before data was ready
-  document.getElementById('rep-selector').innerHTML = '';
-  document.getElementById('welcome-rep-select').innerHTML = '';
-  initRepSelector();
+  // Sync selector values after data loads (don't clear — immediateInit already populated them)
+  const sSel = document.getElementById('rep-selector');
+  const wSel = document.getElementById('welcome-rep-select');
+  if (sSel && currentRep) sSel.value = currentRep;
+  if (wSel && currentRep) wSel.value = currentRep;
   updateLeadsBadge();
   setTimeout(loadLeadsFromFirebase, 2000);
 
