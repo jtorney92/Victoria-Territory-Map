@@ -521,15 +521,28 @@ async function loadAllData() {
     ]);
 
     if (!suburbRes.ok || !coordsRes.ok || !leadsRes.ok) {
-      throw new Error('Failed to load data files — check suburb_data.json, customer_coords.json, leads_data.json are uploaded to GitHub');
+      const missing = [];
+      if (!suburbRes.ok) missing.push('suburb_data.json');
+      if (!coordsRes.ok) missing.push('customer_coords.json');
+      if (!leadsRes.ok) missing.push('leads_data.json');
+      console.warn('Missing data files:', missing.join(', '), '— map will load without customer data');
+      // Don't throw — let GeoJSON load anyway, just without customer data
+      if (overlay) overlay.innerHTML = '<div style="padding:16px;text-align:center;color:#ffd740">⚠ Loading map without data files.<br><small style=\'color:#888\'>Upload ' + missing.join(', ') + ' to GitHub.</small></div>';
+      return false;
     }
 
     setMsg('Parsing suburb data…');
-    const [suburbData, coordsData, leadsDataRaw] = await Promise.all([
-      suburbRes.json(),
-      coordsRes.json(),
-      leadsRes.json(),
-    ]);
+    let suburbData = {}, coordsData = [], leadsDataRaw = [];
+    try {
+      [suburbData, coordsData, leadsDataRaw] = await Promise.all([
+        suburbRes.json(),
+        coordsRes.json(),
+        leadsRes.json(),
+      ]);
+    } catch(parseErr) {
+      console.error('JSON parse error:', parseErr);
+      throw new Error('data files: JSON parse failed — ' + parseErr.message);
+    }
 
     // Assign to globals
     Object.assign(SUBURB_DATA, suburbData);
@@ -1289,7 +1302,10 @@ async function loadGeoJSON() {
 
 // Load external data files in parallel, then load GeoJSON and init map
 Promise.all([loadAllData(), loadGeoJSON()]).then(([dataOk, geojson]) => {
-  if (!dataOk) return; // data load failed, error shown in overlay
+  // Even if data files failed, show the map (just without customer dots)
+  if (!dataOk) {
+    console.warn('Data files missing — showing map without customer data');
+  }
 
   // Rebuild lookup from loaded SUBURB_DATA
   Object.entries(SUBURB_DATA).forEach(([k,v]) => {
@@ -1436,10 +1452,24 @@ Promise.all([loadAllData(), loadGeoJSON()]).then(([dataOk, geojson]) => {
   setTimeout(refreshLeadPins, 800);
 
 }).catch(err => {
+  console.error('Map init error:', err);
+  const msg = (err && err.message) ? err.message : String(err);
+  const isDataFile = msg.includes('suburb_data') || msg.includes('customer_coords') || msg.includes('leads_data') || msg.includes('data files');
+  const isGeoJSON = msg.includes('suburb boundaries') || msg.includes('GeoJSON') || msg.includes('geojson');
+  const isJS = !isDataFile && !isGeoJSON;
   document.getElementById('loader').innerHTML = `
-    <h2 style="color:#e94560">⚠ Map Load Failed</h2>
-    <p>Could not fetch suburb boundaries. Check your internet connection.</p>
-    <button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#e94560;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">↺ Retry</button>`;
+    <div style="text-align:center;padding:20px">
+      <h2 style="color:#e94560;margin-bottom:10px">⚠ Map Load Failed</h2>
+      <p style="color:#aaa;font-size:13px;margin-bottom:8px">
+        ${isDataFile
+          ? 'Data files not found — make sure suburb_data.json, customer_coords.json and leads_data.json are in the repo root.'
+          : isGeoJSON
+          ? 'Could not fetch suburb boundaries. Check your internet connection and try again.'
+          : 'A script error occurred during map initialisation.'}
+      </p>
+      <p style="color:#555;font-size:11px;margin-bottom:16px;font-family:monospace">${msg}</p>
+      <button onclick="location.reload()" style="padding:10px 24px;background:#e94560;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">↺ Retry</button>
+    </div>`;
 });
 
 // ── LEADS & PROSPECTS SYSTEM ────────────────────────────────────────────────
