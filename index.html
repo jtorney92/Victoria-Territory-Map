@@ -461,6 +461,10 @@ let LEADS_DATA = [];
 // newCustomers pre-merged into suburb_data.json
 
 const REP_COLORS = {"Jason O'Brien": "#2196F3", "Martin Kelliher": "#4CAF50", "Angelo Giacobbe": "#FF5722", "Brad Armstrong": "#9C27B0", "Leanne Grigg": "#FF9800", "Gaby McIntosh": "#00BCD4", "House Account": "#795548", "Gerard Ballantyne": "#E91E63", "Trudi Alcock": "#607D8B", "Katharine Butterworth": "#FFEB3B", "Robert Guerrini": "#FFFFFF"};
+const KNOWN_REPS = Object.keys(REP_COLORS);
+
+let currentRep = localStorage.getItem('currentRep') || '';
+let leadsFilter = 'mine'; // 'mine' | 'pool' | 'all'
 
 // Stats: calculated after NetSuite customer injection
 function updateStats() {
@@ -1445,7 +1449,9 @@ let CUSTOMER_COORDS = [];
 
 // Normalise compact prospect data into full lead objects
 (function() {
-  const KNOWN_REPS = Object.keys(REP_COLORS);
+  const KNOWN_REPS_LOCAL = Object.keys(REP_COLORS);
+
+// currentRep and leadsFilter are global — declared at top of script
   LEADS_DATA = LEADS_DATA.map((p, i) => ({
     id: 'p_' + i,
     name: p.n,
@@ -1455,7 +1461,7 @@ let CUSTOMER_COORDS = [];
     lat: p.lat,
     lng: p.lng,
     suburb: '',  // extracted from address on demand
-    isPool: !KNOWN_REPS.includes(p.r),  // ex-reps go to pool
+    isPool: !KNOWN_REPS_LOCAL.includes(p.r),  // ex-reps go to pool
     status: p.s || 'Lead',
   }));
   // Extract suburb from address for grouping
@@ -1475,10 +1481,9 @@ let CUSTOMER_COORDS = [];
     if (!p.suburb) p.suburb = 'Unknown suburb';
   });
 })();
-let currentRep = localStorage.getItem('currentRep') || '';
-let leadsFilter = 'mine'; // 'mine' | 'pool' | 'all'
+// currentRep declared early above
+// leadsFilter declared early above
 
-const KNOWN_REPS = Object.keys(REP_COLORS);
 
 function initRepSelector() {
   const allReps = ['Administrator', ...KNOWN_REPS];
