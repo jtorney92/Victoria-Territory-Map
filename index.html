@@ -411,10 +411,12 @@ const REP_COLORS = {"Jason O'Brien": "#2196F3", "Martin Kelliher": "#4CAF50", "A
 function updateStats() {
   const tc = Object.values(SUBURB_DATA).reduce((s,v) => s + v.customers.length, 0);
   const el = document.getElementById('stats-line');
+  let repCount = 11;
+  try { repCount = Object.keys(REP_COLORS).length; } catch(e) {}
   if (el) el.innerHTML =
     '<span class="stat-pill">' + tc + ' customers</span>' +
     '<span class="stat-pill">' + Object.keys(SUBURB_DATA).length + ' suburbs</span>' +
-    '<span class="stat-pill">' + Object.keys(REP_COLORS).length + ' reps</span>';
+    '<span class="stat-pill">' + repCount + ' reps</span>';
 }
 updateStats();
 
