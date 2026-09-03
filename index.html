@@ -572,6 +572,16 @@ async function loadAllData() {
   }
 }
 
+// ── Immediate init — only needs inline data (REP_COLORS) ─────────────────
+// Called before JSON files load so the welcome modal has rep options
+(function immediateInit() {
+  try {
+    initRepSelector();
+    loadLeads();          // load any saved leads from localStorage
+    updateLeadsBadge();
+  } catch(e) { /* REP_COLORS not ready yet — will retry in Promise.all */ }
+})();
+
 const map = L.map('map', { center: [-37.0, 144.5], zoom: 7 });
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
   attribution:'© Esri © OpenStreetMap contributors', maxZoom:16
@@ -1284,12 +1294,15 @@ Promise.all([loadAllData(), loadGeoJSON()]).then(([dataOk, geojson]) => {
     lookup[k] = { ...v, displayName: display };
   });
 
+  // Refresh UI now that all data is loaded
   updateStats();
   buildLegend();
   buildRepFilterBtns();
+  // Re-run initRepSelector in case it ran before data was ready
+  document.getElementById('rep-selector').innerHTML = '';
+  document.getElementById('welcome-rep-select').innerHTML = '';
   initRepSelector();
   updateLeadsBadge();
-  loadLeads();
   setTimeout(loadLeadsFromFirebase, 2000);
 
 
