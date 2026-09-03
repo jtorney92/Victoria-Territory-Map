@@ -2183,13 +2183,17 @@ function editLead(id) {
   const extra = document.getElementById('extra-' + id);
   if (!extra) return;
   if (extra.querySelector('.edit-wrap')) { extra.innerHTML = ''; return; }
-  extra.innerHTML = '<div class="edit-wrap" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">'
-    + '<input type="text" value="' + (lead.name||'').replace(/"/g,'&quot;') + '" id="edit-name-' + id + '" style="background:#16213e;border:1px solid #1a3a6e;color:white;border-radius:6px;padding:5px 8px;font-size:12px">'
-    + '<input type="text" value="' + (lead.address||'').replace(/"/g,'&quot;') + '" id="edit-addr-' + id + '" style="background:#16213e;border:1px solid #1a3a6e;color:white;border-radius:6px;padding:5px 8px;font-size:12px">'
-    + '<div style="display:flex;gap:6px">'
-    + '<button class="la-btn la-claim" onclick="saveLeadEdit('' + id + '')">Save</button>'
-    + '<button class="la-btn" style="background:#0f3460;color:#aaa;border:1px solid #1a3a6e" onclick="document.getElementById('extra-' + id + '').innerHTML=''">Cancel</button>'
-    + '</div></div>';
+  const safeName = (lead.name||'').replace(/"/g,'&quot;');
+  const safeAddr = (lead.address||'').replace(/"/g,'&quot;');
+  extra.innerHTML = [
+    '<div class="edit-wrap" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">',
+    '<input type="text" value="' + safeName + '" id="edit-name-' + id + '" style="background:#16213e;border:1px solid #1a3a6e;color:white;border-radius:6px;padding:5px 8px;font-size:12px">',
+    '<input type="text" value="' + safeAddr + '" id="edit-addr-' + id + '" style="background:#16213e;border:1px solid #1a3a6e;color:white;border-radius:6px;padding:5px 8px;font-size:12px">',
+    '<div style="display:flex;gap:6px">',
+    '<button class="la-btn la-claim" onclick="saveLeadEdit(\'' + id + '\')">Save</button>',
+    '<button class="la-btn" style="background:#0f3460;color:#aaa;border:1px solid #1a3a6e" onclick="var x=document.getElementById(\'extra-' + id + '\');if(x)x.innerHTML=\'\'" >Cancel</button>',
+    '</div></div>'
+  ].join('');
 }
 
 function saveLeadEdit(id) {
