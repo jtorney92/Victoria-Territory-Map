@@ -895,6 +895,22 @@ function buildLegend() {
     el.addEventListener('click', () => toggleRep(el, el.dataset.rep));
   });
 }
+// ── Rep filter buttons (below legend) ────────────────────────────────────
+function buildRepFilterBtns() {
+  const wrap = document.getElementById('rep-filter-btns');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  Object.entries(REP_COLORS).sort((a,b) => a[0].localeCompare(b[0])).forEach(([rep, color]) => {
+    const btn = document.createElement('button');
+    btn.textContent = rep.split(' ')[0];
+    btn.title = rep;
+    btn.style.cssText = 'font-size:10px;padding:3px 8px;border:2px solid ' + color + ';border-radius:10px;background:transparent;color:' + color + ';cursor:pointer;white-space:nowrap;transition:all 0.15s';
+    btn.dataset.rep = rep;
+    btn.onclick = () => filterToRep(rep);
+    wrap.appendChild(btn);
+  });
+}
+
 
 function toggleRep(el, rep) {
   dimmed.has(rep) ? dimmed.delete(rep) : dimmed.add(rep);
@@ -1952,16 +1968,18 @@ document.addEventListener('keydown', e => {
 const FIREBASE_URL = 'https://scotchmans-territory-map-default-rtdb.firebaseio.com';
 
 async function syncLeadsToFirebase() {
+  if (!FIREBASE_URL || FIREBASE_URL.includes('default-rtdb')) return; // not configured
   try {
     await fetch(FIREBASE_URL + '/leads.json', {
       method: 'PUT',
       body: JSON.stringify(LEADS_DATA),
       headers: { 'Content-Type': 'application/json' }
     });
-  } catch(e) { /* offline — saved locally only */ }
+  } catch(e) { /* offline */ }
 }
 
 async function loadLeadsFromFirebase() {
+  if (!FIREBASE_URL || FIREBASE_URL.includes('default-rtdb')) return; // not configured
   try {
     const r = await fetch(FIREBASE_URL + '/leads.json');
     if (r.ok) {
@@ -1984,7 +2002,7 @@ function saveleads() {
 }
 
 // Poll for changes every 30 seconds
-setInterval(loadLeadsFromFirebase, 30000);
+setInterval(() => { try { loadLeadsFromFirebase(); } catch(e) {} }, 30000);
 // Load on startup
 setTimeout(loadLeadsFromFirebase, 2000);
 
@@ -2083,6 +2101,86 @@ function drawAllCustomerDots() {
   console.log('Customer dots: ' + realCount + ' at real addresses, ' + fallbackCount + ' suburb fallbacks');
 }
 
+
+
+// ── Rep filter ────────────────────────────────────────────────────────────
+let activeRepFilter = null;
+
+function filterToRep(rep) {
+  activeRepFilter = rep || null;
+  document.querySelectorAll('#rep-filter-btns button').forEach(btn => {
+    const isActive = btn.dataset.rep === rep;
+    const color = REP_COLORS[btn.dataset.rep] || '#aaa';
+    btn.style.background = isActive ? color : 'transparent';
+    btn.style.color = isActive ? '#fff' : color;
+    btn.style.fontWeight = isActive ? '700' : 'normal';
+  });
+  const allBtn = document.getElementById('filter-all-btn');
+  if (allBtn) { allBtn.style.fontWeight = rep ? 'normal' : '700'; allBtn.style.color = rep ? '#aaa' : '#fff'; }
+  Object.entries(allLayers).forEach(([key, layer]) => {
+    const info = lookup[key];
+    if (!info) return;
+    if (!rep || info.reps.includes(rep)) map.addLayer(layer);
+    else map.removeLayer(layer);
+  });
+  if (selectedLayer && rep) {
+    const selKey = Object.keys(allLayers).find(k => allLayers[k] === selectedLayer);
+    const selInfo = selKey ? lookup[selKey] : null;
+    if (selInfo && !selInfo.reps.includes(rep)) { selectedLayer = null; activeSuburbKey = null; clearViewPanel(); }
+  }
+}
+
+function exportCSV() {
+  const repFilter = activeRepFilter;
+  const rows = [['Suburb','Rep(s)','Customer','Shared Territory']];
+  Object.entries(lookup).forEach(([key, info]) => {
+    if (repFilter && !info.reps.includes(repFilter)) return;
+    for (const c of info.customers) {
+      if (repFilter && c.rep !== repFilter) continue;
+      rows.push([info.displayName || key, info.reps.join(' / '), c.name, info.reps.length > 1 ? 'Yes' : 'No']);
+    }
+  });
+  const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = repFilter ? repFilter.replace(/ /g,'_') + '_territory.csv' : 'all_territories.csv';
+  a.click();
+}
+
+function editLead(id) {
+  const lead = LEADS_DATA.find(l => l.id === id);
+  if (!lead) return;
+  const extra = document.getElementById('extra-' + id);
+  if (!extra) return;
+  if (extra.querySelector('.edit-wrap')) { extra.innerHTML = ''; return; }
+  extra.innerHTML = '<div class="edit-wrap" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">'
+    + '<input type="text" value="' + (lead.name||'').replace(/"/g,'&quot;') + '" id="edit-name-' + id + '" style="background:#16213e;border:1px solid #1a3a6e;color:white;border-radius:6px;padding:5px 8px;font-size:12px">'
+    + '<input type="text" value="' + (lead.address||'').replace(/"/g,'&quot;') + '" id="edit-addr-' + id + '" style="background:#16213e;border:1px solid #1a3a6e;color:white;border-radius:6px;padding:5px 8px;font-size:12px">'
+    + '<div style="display:flex;gap:6px">'
+    + '<button class="la-btn la-claim" onclick="saveLeadEdit('' + id + '')">Save</button>'
+    + '<button class="la-btn" style="background:#0f3460;color:#aaa;border:1px solid #1a3a6e" onclick="document.getElementById('extra-' + id + '').innerHTML=''">Cancel</button>'
+    + '</div></div>';
+}
+
+function saveLeadEdit(id) {
+  const lead = LEADS_DATA.find(l => l.id === id);
+  if (!lead) return;
+  const nameEl = document.getElementById('edit-name-' + id);
+  const addrEl = document.getElementById('edit-addr-' + id);
+  if (nameEl && nameEl.value.trim()) lead.name = nameEl.value.trim();
+  if (addrEl && addrEl.value.trim() && addrEl.value.trim() !== lead.address) {
+    saveLeadAddress(id, addrEl.value.trim()); return;
+  }
+  saveleads(); renderLeadsPanel();
+}
+
+function deleteLead(id) {
+  if (!confirm('Remove this lead? Cannot be undone.')) return;
+  const idx = LEADS_DATA.findIndex(l => l.id === id);
+  if (idx === -1) return;
+  LEADS_DATA.splice(idx, 1);
+  saveleads(); updateLeadsBadge(); renderLeadsPanel(); refreshLeadPins(null);
+}
 </script>
 
 <!-- Collapsible guide tab -->
