@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Victoria Territory Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -210,71 +213,67 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
 
 /* Collapsible guide tab — fixed to LEFT side (map side, not sidebar) */
 #guide-tab {
+  display: none;
   position: fixed;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 2000;
-  display: flex;
-  align-items: stretch;
-  flex-direction: row;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 9998;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
-#guide-tab-label {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  transform: rotate(180deg);
-  background: #e94560;
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 12px 6px;
-  cursor: pointer;
-  border-radius: 0 6px 6px 0;
-  letter-spacing: .05em;
-  user-select: none;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.3);
-  transition: background .15s;
-  white-space: nowrap;
-  order: 2;
-}
-#guide-tab-label:hover { background: #c73652; }
+#guide-tab.open { display: flex; }
 #guide-tab-content {
-  width: 0;
-  overflow: hidden;
-  transition: width .25s ease;
   background: #16213e;
   border: 1px solid #0f3460;
-  border-left: none;
-  border-radius: 0 8px 8px 0;
-  box-shadow: 4px 0 16px rgba(0,0,0,0.4);
-  order: 1;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 85vh;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
 }
-#guide-tab:hover #guide-tab-content,
-#guide-tab.open #guide-tab-content {
-  width: 300px;
+#guide-tab-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #e94560;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 12px 12px 0 0;
+  flex-shrink: 0;
 }
+#guide-tab-label:hover { background: #c73652; }
 #guide-tab-inner {
-  width: 300px;
-  padding: 16px;
+  padding: 16px 18px;
   overflow-y: auto;
-  max-height: 80vh;
   font-size: 12px;
   color: #ccc;
   line-height: 1.6;
-}
-@media (max-width: 600px) {
-  #guide-tab { top: auto; bottom: 60px; transform: none; }
-  #guide-tab:hover #guide-tab-content,
-  #guide-tab.open #guide-tab-content { width: 260px; }
-  #guide-tab-inner { width: 260px; max-height: 60vh; }
-}
-
-.type-toggle-btn {
-  font-size:10px;padding:3px 8px;border-radius:10px;border:1px solid #1a3a6e;
-  background:transparent;color:#90caf9;cursor:pointer;white-space:nowrap;transition:all .15s;
+  -webkit-overflow-scrolling: touch;
 }
 .type-toggle-btn.active { background:#1a3a6e;color:#fff;border-color:#2a5aae; }
 .type-toggle-btn:not(.active) { opacity:0.45; }
+
+.cluster-dot {
+  background: rgba(26,42,90,0.9);
+  border: 2px solid rgba(255,255,255,0.7);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.cluster-sm { width:28px;height:28px;font-size:11px; }
+.cluster-md { width:34px;height:34px;font-size:12px;background:rgba(233,69,96,0.85); }
+.cluster-lg { width:40px;height:40px;font-size:13px;background:rgba(233,69,96,0.95);border-color:rgba(255,100,100,0.8); }
 </style>
 </head>
 <body>
@@ -376,6 +375,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
       <button onclick="toggleType('prospect')" id="toggle-prospect" class="type-toggle-btn active" title="Toggle prospect pins">◆ Prospects</button>
       <button onclick="toggleType('pool')" id="toggle-pool" class="type-toggle-btn active" title="Toggle unassigned pool">○ Pool</button>
     </div>
+    <button onclick="toggleGuide()" style="position:absolute;top:8px;right:10px;background:none;border:1px solid #1a3a6e;color:#90caf9;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">📖 Guide</button>
     <div id="search-wrap">
       <span class="si">⌕</span>
       <input type="text" id="search" placeholder="Search suburb or customer…" autocomplete="off">
@@ -384,8 +384,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   </div>
 
   <div id="mode-bar">
-    <button class="mode-btn active" id="btn-view-mode" onclick="setMode('view')">👁 View</button>
-    <button class="mode-btn" id="btn-edit-mode" onclick="setMode('edit')">✏️ Edit</button>
+    <button class="mode-btn active" id="btn-view-mode" onclick="setMode('view')">👁 Customers</button>
+    <button class="mode-btn" id="btn-edit-mode" onclick="setMode('edit')">🔍 Prospect</button>
     <button class="mode-btn" id="btn-leads-mode" onclick="setMode('leads')" style="position:relative">📋 Leads<span id="leads-badge" style="display:none;position:absolute;top:4px;right:4px;background:#e94560;color:white;border-radius:50%;width:14px;height:14px;font-size:9px;line-height:14px;text-align:center;font-weight:700"></span></button>
   </div>
 
@@ -422,10 +422,13 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; displ
   </div>
 
   <div id="view-panel">
-    <div class="placeholder">👆 Tap a suburb to lock &amp; view<br><span style="font-size:11px;color:#555">Zoom in to see customer &amp; lead pins</span></div>
+    <div class="placeholder">👆 Click a suburb to see its customers<br><span style="font-size:11px;color:#555">Switch to 🔍 Prospect to find new venues</span></div>
   </div>
 
   <div id="edit-panel">
+    <div style="padding:10px 14px 4px;font-size:11px;color:#888">
+      Click a suburb to unlock edit options — reassign reps, edit customers, or search nearby venues.
+    </div>
     <div class="ep-placeholder" style="color:#555;font-size:13px;text-align:center;margin-top:40px">✏️ Click any suburb on the map<br>to edit its details</div>
   </div>
 
@@ -711,17 +714,34 @@ function setMode(mode) {
   currentMode = mode;
   document.getElementById('btn-view-mode').classList.toggle('active', mode === 'view');
   document.getElementById('btn-edit-mode').classList.toggle('active', mode === 'edit');
+  const leadsBtn = document.getElementById('btn-leads-mode');
+  if (leadsBtn) leadsBtn.classList.toggle('active', mode === 'leads');
+
   document.getElementById('view-panel').style.display = mode === 'view' ? 'block' : 'none';
   document.getElementById('edit-panel').style.display = mode === 'edit' ? 'block' : 'none';
-  // Re-show customer dots when switching back to View on a locked suburb
+  document.getElementById('leads-panel').style.display = mode === 'leads' ? 'block' : 'none';
+
+  // Venue controls follow the Prospect tab
+  const vc = document.getElementById('venue-controls');
+  if (vc) vc.style.display = mode === 'edit' ? 'block' : 'none';
+
   if (mode === 'view' && activeSuburbKey) {
     const info = lookup[activeSuburbKey];
     if (info) showCustomerDots(activeSuburbKey, info);
   }
+
   if (mode === 'edit') {
-    if (activeSuburbKey) renderEditPanel(activeSuburbKey);
-    else document.getElementById('edit-panel').innerHTML = '<div class="ep-placeholder" style="color:#555;font-size:13px;text-align:center;margin-top:40px">✏️ Click a suburb on the map first</div>';
+    // Show prospect/edit panel
+    if (activeSuburbKey) {
+      renderEditPanel(activeSuburbKey);
+    } else {
+      document.getElementById('edit-panel').innerHTML =
+        '<div class="ep-placeholder" style="color:#555;font-size:13px;text-align:center;margin-top:40px">' +
+        '🔍 Click a suburb on the map first,<br>then search for nearby venues to prospect.</div>';
+    }
   }
+
+  if (mode === 'leads') renderLeadsPanel();
 }
 
 // ── VIEW PANEL ────────────────────────────────────────────────────────────────
@@ -758,56 +778,37 @@ function clearViewPanel() {
 function renderEditPanel(key) {
   const panel = document.getElementById('edit-panel');
   const info = lookup[key];
-  if (!info) { panel.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;margin-top:40px">✏️ Click any suburb on the map<br>to edit its details</div>'; return; }
-  const allReps = Object.keys(REP_COLORS);
-  let html = `<div class="ep-suburb-title">${info.displayName}</div>`;
-  html += `<div class="ep-section">Territory Rep(s)</div>`;
-  html += `<div class="ep-reassign-section"><h4>Assigned to:</h4>`;
-  for (const rep of info.reps) {
-    html += `<div class="ep-rep-row">
-      <span class="ep-rep-badge" style="background:${repColor(rep)};color:${repTextColor(rep)}">${rep}</span>
-      ${info.reps.length > 1 ? `<button class="ep-btn ep-btn-del" onclick="removeRepFromSuburb('${key}','${rep.replace(/'/g, "\'")}')" >Remove</button>` : ''}
-    </div>`;
-  }
-  html += `<div style="display:flex;gap:6px;margin-top:8px">
-    <select id="ep-add-rep-sel" class="ep-select">
-      <option value="">Add rep…</option>
-      ${allReps.filter(r => !info.reps.includes(r)).map(r => `<option value="${r}">${r}</option>`).join('')}
-    </select>
-    <button class="ep-btn ep-btn-save" onclick="addRepToSuburb('${key}')">Add</button>
-  </div></div>`;
-  html += `<div class="ep-section">Customers (${info.customers.length})</div>`;
-  info.customers.forEach((c, i) => {
-    html += `<div class="ep-customer-row" id="cust-row-${i}">
-      <div style="flex:1">
-        <div class="ep-customer-name">${c.name}</div>
-        <div class="ep-customer-rep" style="color:${repColor(c.rep) === '#FFFFFF' ? '#aaa' : repColor(c.rep)}">${c.rep}</div>
-        ${c.topSale ? `<div class="ep-customer-sale">⭐ ${c.topSale}</div>` : ''}
+  if (!info) return;
+
+  const repBadges = info.reps.map(r =>
+    `<span class="rep-badge" style="background:${repColor(r)};color:${repTextColor(r)}">${r}</span>`
+  ).join('');
+
+  // Count leads/prospects in this suburb area
+  const suburbLower = (info.displayName || key).toLowerCase();
+  const nearbyLeads = LEADS_DATA.filter(l => !l.isPool &&
+    ((l.suburb || '').toLowerCase().includes(suburbLower) ||
+     (l.address || '').toLowerCase().includes(suburbLower))
+  ).length;
+
+  panel.innerHTML = `
+    <div style="padding:14px 16px">
+      <h2 style="font-size:14px;margin-bottom:6px">${info.displayName || key}</h2>
+      <div style="margin-bottom:10px">${repBadges}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:#aaa;margin-bottom:14px">
+        <span>👥 ${info.customers.length} customers</span>
+        ${nearbyLeads > 0 ? `<span>📋 ${nearbyLeads} leads nearby</span>` : ''}
       </div>
-      <button class="ep-btn ep-btn-edit" onclick="editCustomer('${key}',${i})" title="Edit">✏</button>
-      <button class="ep-btn ep-btn-del" onclick="deleteCustomer('${key}',${i})" title="Remove">✕</button>
+      <div style="background:#0f3460;border-radius:8px;padding:10px 12px;font-size:12px;color:#90caf9;margin-bottom:10px">
+        💡 Use <strong>Find nearby venues</strong> below to discover bars, restaurants and bottle shops to prospect in this area. Export the results to XLSX for your visit list.
+      </div>
+      <div style="font-size:11px;color:#555;margin-top:8px">
+        Need to reassign this suburb or edit a customer? Use the
+        <a href="#" onclick="setMode('view');return false" style="color:#90caf9">Customers tab</a>.
+      </div>
     </div>`;
-  });
-  html += `<div class="ep-section">Add Customer</div>
-  <div class="inline-edit">
-    <div class="inline-edit-row"><label for="ep-new-name">Name</label><input id="ep-new-name" class="ep-input" placeholder="Customer name…"></div>
-    <div class="inline-edit-row"><label for="ep-new-rep">Rep</label>
-      <select id="ep-new-rep" class="ep-select">
-        ${allReps.map(r => `<option value="${r}" ${info.reps[0]===r?'selected':''}>${r}</option>`).join('')}
-      </select>
-    </div>
-    <div class="inline-edit-row"><label for="ep-new-sale">Top Sale</label><input id="ep-new-sale" class="ep-input" placeholder="e.g. Penfolds Grange (optional)"></div>
-    <button class="ep-btn ep-btn-save" style="width:100%;margin-top:4px" onclick="addCustomer('${key}')">+ Add Customer</button>
-  </div>`;
-  panel.innerHTML = html;
 }
 
-// ── EDIT ACTIONS ──────────────────────────────────────────────────────────────
-function markChanged() {
-  hasChanges = true;
-  document.getElementById('save-bar').style.display = 'flex';
-  lookup = buildLookup();
-}
 
 function deleteCustomer(key, idx) {
   if (!confirm('Remove this customer?')) return;
@@ -1655,8 +1656,13 @@ function renderLeadsPanel() {
 
   let html = `<div class="leads-filter-bar">
     <button class="lf-btn ${leadsFilter==='mine'?'active':''}" onclick="setLeadsFilter('mine')">My Leads (${mine.length})</button>
-    <button class="lf-btn ${leadsFilter==='pool'?'active':''}" onclick="setLeadsFilter('pool')">🔓 Unassigned Pool (${pool.length})</button>
-    <button class="lf-btn ${leadsFilter==='all'?'active':''}" onclick="setLeadsFilter('all')">All (${mine.length+pool.length})</button>
+    <button class="lf-btn ${leadsFilter==='pool'?'active':''}" onclick="setLeadsFilter('pool')">🔓 Pool (${pool.length})</button>
+    <button class="lf-btn ${leadsFilter==='all'?'active':''}" onclick="setLeadsFilter('all')">All</button>
+  </div>
+  <div style="padding:6px 10px;border-bottom:1px solid #0f3460">
+    <input type="text" id="leads-search" placeholder="Search leads by name or suburb…"
+      oninput="filterLeadsDisplay(this.value)"
+      style="width:100%;background:#0f3460;border:1px solid #1a3a6e;color:white;border-radius:6px;padding:5px 8px;font-size:12px">
   </div>`;
 
   if (!all.length) {
@@ -1683,7 +1689,15 @@ function renderLeadsPanel() {
           <span class="lc-status ${statusCls}">${statusLabel}</span>
           ${l.rep && !l.isPool ? `<span>👤 ${l.rep}</span>` : ''}
           ${l.address ? `<span>📍 ${l.address}</span>` : '<span style="color:#555">No address yet</span>'}
+          ${l.isPool ? `<span style="color:#f44336;font-size:10px">● Unassigned</span>` : ''}
         </div>
+        ${l.isPool && l.address ? `<div style="margin-top:4px;font-size:11px;color:#aaa">
+          <a href="https://www.google.com/search?q=${encodeURIComponent(l.name+' '+l.address)}" 
+             target="_blank" style="color:#90caf9;text-decoration:none">🔍 Search online</a>
+          &nbsp;·&nbsp;
+          <a href="https://maps.google.com/?q=${encodeURIComponent(l.name+' '+l.address)}"
+             target="_blank" style="color:#90caf9;text-decoration:none">📍 Google Maps</a>
+        </div>` : ''}
         <div class="lead-actions">
           ${l.isPool ? `<button class="la-btn la-claim" onclick="claimLead('${l.id}')">✋ Claim for me</button>` : ''}
           ${!l.isPool ? `<button class="la-btn la-transfer" onclick="showTransfer('${l.id}')">↔ Transfer</button>` : ''}
@@ -2045,18 +2059,26 @@ let customerDots = [];
 let clearDotsTimeout = null;
 
 function locateCustomer(suburbKey) {
-  // Zoom to the suburb centroid
   const layer = allLayers[suburbKey];
   if (!layer) return;
-  const bounds = layer.getBounds();
-  const centre = bounds.getCenter();
-  map.setView(centre, Math.max(map.getZoom(), 14), { animate: true });
-  // Flash the suburb highlight
-  layer.setStyle({ fillOpacity: 0.5, weight: 3 });
-  setTimeout(() => {
-    const info = lookup[suburbKey];
-    if (info) layer.setStyle(styleFor(info, false, true));
-  }, 600);
+  // Deselect previous
+  if (selectedLayer && selectedLayer !== layer) {
+    const prevKey = Object.keys(allLayers).find(k => allLayers[k] === selectedLayer);
+    const prevInfo = prevKey ? lookup[prevKey] : null;
+    if (prevInfo) selectedLayer.setStyle(styleFor(prevInfo, false, false));
+    else selectedLayer.setStyle({ fillColor:'#333', fillOpacity:0.15, color:'#555', weight:0.5 });
+  }
+  // Lock suburb
+  selectedLayer = layer;
+  activeSuburbKey = suburbKey;
+  const info = lookup[suburbKey];
+  if (info) layer.setStyle(styleFor(info, false, true));
+  // Zoom
+  map.setView(layer.getBounds().getCenter(), Math.max(map.getZoom(), 14), { animate: true });
+  // Update sidebar
+  setMode('view');
+  if (info) renderViewPanel(info, suburbKey);
+  showVenueButton(suburbKey);
 }
 
 // Dots are always-on via drawAllCustomerDots — these are kept for compatibility
@@ -2066,8 +2088,27 @@ function clearCustomerDots() {}
 
 // ── Customer dots — real geocoded coordinates ─────────────────────────────
 function drawAllCustomerDots() {
-  if (window._custDots) window._custDots.forEach(m => map.removeLayer(m));
+  // Remove old cluster group if exists
+  if (window._clusterGroup) map.removeLayer(window._clusterGroup);
   window._custDots = [];
+
+  const clusterGroup = L.markerClusterGroup({
+    maxClusterRadius: 40,
+    iconCreateFunction: cluster => {
+      const count = cluster.getChildCount();
+      const size = count > 50 ? 'lg' : count > 10 ? 'md' : 'sm';
+      return L.divIcon({
+        html: '<div class="cluster-dot cluster-' + size + '">' + count + '</div>',
+        className: '',
+        iconSize: L.point(36, 36)
+      });
+    },
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    zoomToBoundsOnClick: true,
+    disableClusteringAtZoom: 14,
+  });
+  window._clusterGroup = clusterGroup;
 
   // Build a name→coords lookup from geocoded data
   const coordMap = {};
@@ -2119,7 +2160,8 @@ function drawAllCustomerDots() {
       if (!isTypeVisible('customer')) return;
       const icon = makeCustomerIcon(col);
 
-      const marker = L.marker([lat, lng], { icon, interactive: true, zIndexOffset: -100 }).addTo(map);
+      const marker = L.marker([lat, lng], { icon, interactive: true, zIndexOffset: -100 });
+      clusterGroup.addLayer(marker);
       marker.bindTooltip(
         '<strong>' + c.name + '</strong>' +
         '<br><small style="color:#aaa">' + (match ? match.a : 'Suburb: ' + (info.displayName || key)) + '</small>' +
@@ -2131,6 +2173,8 @@ function drawAllCustomerDots() {
     });
   });
 
+  map.addLayer(clusterGroup);
+  window._custDots = clusterGroup.getLayers();
   console.log('Customer dots: ' + realCount + ' at real addresses, ' + fallbackCount + ' suburb fallbacks');
 }
 
@@ -2218,11 +2262,35 @@ function deleteLead(id) {
   LEADS_DATA.splice(idx, 1);
   saveleads(); updateLeadsBadge(); renderLeadsPanel(); refreshLeadPins(null);
 }
+
+// ── Suburb coordinate check ────────────────────────────────────────────────
+function checkSuburbMismatches() {
+  if (!CUSTOMER_COORDS || !CUSTOMER_COORDS.length || !Object.keys(allLayers).length) return;
+  const coordMap = {};
+  CUSTOMER_COORDS.forEach(c => { coordMap[c.n.toLowerCase().trim()] = c; });
+  let mismatches = 0;
+  Object.entries(lookup).forEach(([key, info]) => {
+    const layer = allLayers[key];
+    if (!layer) return;
+    const bounds = layer.getBounds();
+    (info.customers || []).forEach(c => {
+      const match = coordMap[c.name.toLowerCase().trim()];
+      if (!match) return;
+      if (!bounds.contains(L.latLng(match.lat, match.lng))) mismatches++;
+    });
+  });
+  console.log('Suburb mismatch check: ' + mismatches + ' customers geocoded outside their assigned suburb polygon.');
+}
+setTimeout(checkSuburbMismatches, 4000);
+
 </script>
 
-<!-- Collapsible guide tab -->
-<div id="guide-tab" onclick="this.classList.toggle('open')">
+<!-- Guide modal -->
+<div id="guide-tab" onclick="if(event.target===this)this.classList.remove('open')">
   <div id="guide-tab-content">
+    <div id="guide-tab-label" onclick="document.getElementById('guide-tab').classList.remove('open')">
+      📖 Quick Start Guide <span style="font-size:18px;line-height:1">×</span>
+    </div>
     <div id="guide-tab-inner">
       <div style="font-size:14px;font-weight:700;color:#e94560;margin-bottom:12px">📖 Quick Start Guide</div>
 
@@ -2279,8 +2347,8 @@ function deleteLead(id) {
         Zoom in past suburb level to see pins.
       </div>
     </div>
+    </div>
   </div>
-  <div id="guide-tab-label">📖 Guide</div>
 </div>
 
 <div id="hover-hint" style="display:none;position:fixed;background:#1a1a2e;border:1px solid #e94560;border-radius:6px;padding:6px 10px;font-size:12px;color:#eee;pointer-events:none;z-index:9000;box-shadow:0 2px 8px rgba(0,0,0,0.4);max-width:200px"></div>
