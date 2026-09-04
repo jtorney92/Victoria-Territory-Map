@@ -475,7 +475,7 @@ let leadsFilter = 'mine'; // 'mine' | 'pool' | 'all'
 
 // Stats: calculated after NetSuite customer injection
 function updateStats() {
-  const tc = Object.values(SUBURB_DATA).reduce((s,v) => s + v.customers.length, 0);
+  const tc = Object.values(SUBURB_DATA).reduce((s,v) => s + v.customers.filter(c => !c.type || c.type === 'customer').length, 0);
   const el = document.getElementById('stats-line');
   let repCount = 11;
   try { repCount = Object.keys(REP_COLORS).length; } catch(e) {}
@@ -757,16 +757,22 @@ function renderViewPanel(info, key) {
     html += `<span class="rep-badge" style="background:${repColor(rep)};color:${repTextColor(rep)}">${rep}</span>`;
   }
   if (isShared) html += `<div class="shared-tag">⚠ Shared territory</div>`;
-  // Separate actual customers from leads/prospects that also appear in suburb list
-  const leadNames = new Set(LEADS_DATA.map(l => l.name.toLowerCase().trim()));
-  const actualCustomers = info.customers.filter(c => !leadNames.has(c.name.toLowerCase().trim()));
-  const suburbProspects = info.customers.filter(c => leadNames.has(c.name.toLowerCase().trim()));
+  // Use type field from suburb_data (tagged from NetSuite status)
+  const actualCustomers = info.customers.filter(c => !c.type || c.type === 'customer');
+  const suburbProspects = info.customers.filter(c => c.type === 'prospect');
+  const suburbLeads     = info.customers.filter(c => c.type === 'lead');
   const total = actualCustomers.length;
-  html += `<div class="section-label">${total} Customer${total !== 1 ? 's' : ''}${suburbProspects.length > 0 ? ` <span style="color:#888;font-weight:400;font-size:11px">· ${suburbProspects.length} also in leads</span>` : ''}</div>`;
-  // Show actual customers only (not leads/prospects that happen to share the suburb)
+  const extraLabel = [
+    suburbProspects.length ? suburbProspects.length + ' prospect' + (suburbProspects.length > 1 ? 's' : '') : '',
+    suburbLeads.length     ? suburbLeads.length     + ' lead'     + (suburbLeads.length > 1 ? 's' : '')     : '',
+  ].filter(Boolean).join(' · ');
+  html += `<div class="section-label">${total} Customer${total !== 1 ? 's' : ''}${extraLabel ? ` <span style="color:#888;font-weight:400;font-size:11px">· ${extraLabel}</span>` : ''}</div>`;
   const actualByRep = {};
   for (const c of actualCustomers) {
     (actualByRep[c.rep] = actualByRep[c.rep] || []).push(c);
+  }
+  if (actualCustomers.length === 0) {
+    html += '<div style="color:#555;font-size:12px;padding:8px 0">No confirmed customers yet.</div>';
   }
   for (const rep of info.reps) {
     const custs = (actualByRep[rep] || []).slice().sort((a,b) => a.name.localeCompare(b.name));
@@ -775,16 +781,19 @@ function renderViewPanel(info, key) {
       html += `<div class="customer-item" onclick="locateCustomer('${key}')" style="cursor:pointer" title="Click to locate on map">${c.name} <span style='color:#555;font-size:10px'>↗</span></div>`;
     }
   }
-  // Show prospect/lead cross-references at bottom
+  // Show prospects and leads in this suburb
   if (suburbProspects.length > 0) {
-    html += `<div class="section-label" style="margin-top:10px;color:#888">📋 Also in Leads</div>`;
+    html += `<div class="section-label" style="margin-top:10px;color:#81c784">◆ Prospects (${suburbProspects.length})</div>`;
     suburbProspects.slice().sort((a,b) => a.name.localeCompare(b.name)).forEach(c => {
-      const lead = LEADS_DATA.find(l => l.name.toLowerCase().trim() === c.name.toLowerCase().trim());
-      const status = lead ? (lead.leadStatus || lead.status || 'Lead') : 'Lead';
-      const isProsp = status.toLowerCase().includes('prospect');
-      html += `<div class="customer-item" style="opacity:0.7;cursor:default">
-        ${c.name} <span style="font-size:10px;color:${isProsp ? '#81c784' : '#90caf9'}">${isProsp ? '◆' : '▲'} ${isProsp ? 'Prospect' : 'Lead'}</span>
-      </div>`;
+      html += `<div class="customer-item" onclick="locateCustomer('${key}')" style="cursor:pointer;opacity:0.85">
+        ${c.name} <span style='color:#555;font-size:10px'>↗</span></div>`;
+    });
+  }
+  if (suburbLeads.length > 0) {
+    html += `<div class="section-label" style="margin-top:10px;color:#90caf9">▲ Leads (${suburbLeads.length})</div>`;
+    suburbLeads.slice().sort((a,b) => a.name.localeCompare(b.name)).forEach(c => {
+      html += `<div class="customer-item" onclick="locateCustomer('${key}')" style="cursor:pointer;opacity:0.85">
+        ${c.name} <span style='color:#555;font-size:10px'>↗</span></div>`;
     });
   }
   panel.innerHTML = html;
