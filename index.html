@@ -468,6 +468,7 @@ let LEADS_DATA = [];
 
 const REP_COLORS = {"Jason O'Brien": "#2196F3", "Martin Kelliher": "#4CAF50", "Angelo Giacobbe": "#FF5722", "Brad Armstrong": "#9C27B0", "Leanne Grigg": "#FF9800", "Gaby McIntosh": "#00BCD4", "House Account": "#795548", "Gerard Ballantyne": "#E91E63", "Trudi Alcock": "#607D8B", "Katharine Butterworth": "#FFEB3B", "Robert Guerrini": "#FFFFFF"};
 const KNOWN_REPS = Object.keys(REP_COLORS);
+const DOT_ZOOM_THRESHOLD = 11; // show dots when zoomed past this level
 
 let currentRep = localStorage.getItem('currentRep') || '';
 let leadsFilter = 'mine'; // 'mine' | 'pool' | 'all'
@@ -1462,8 +1463,6 @@ Promise.all([loadAllData(), loadGeoJSON()]).then(([dataOk, geojson]) => {
 
   if (geoLayer.getBounds().isValid()) map.fitBounds(geoLayer.getBounds(), { padding:[20,20] });
   // Draw customer dots only when zoomed in (performance)
-  const DOT_ZOOM_THRESHOLD = 11;
-
   function updateDotsForZoom() {
     const z = map.getZoom();
     if (z >= DOT_ZOOM_THRESHOLD) {
@@ -1815,8 +1814,9 @@ function refreshLeadPins(filterSuburb) {
     } else {
       if (dimmed.has(l.rep)) return;
       const sl = (l.leadStatus || l.status || '').toLowerCase();
-      if (sl.includes('prospect') && !isTypeVisible('prospect')) return;
-      if (!sl.includes('prospect') && !isTypeVisible('lead')) return;
+      const isProspectType = sl.includes('prospect');
+      if (isProspectType && !isTypeVisible('prospect')) return;
+      if (!isProspectType && !isTypeVisible('lead')) return;
     }
     const col = l.isPool ? '#f44336' : (REP_COLORS[l.rep] || '#FF9800');
     const statusLower = (l.leadStatus || l.status || '').toLowerCase();
@@ -1990,9 +1990,17 @@ function toggleType(type) {
     hiddenTypes_markers.add(type);
     if (btn) btn.classList.remove('active');
   }
+  // Redraw — always redraw regardless of zoom so toggles work immediately
   if (type === 'customer') {
+    if (window._clusterGroup) {
+      map.removeLayer(window._clusterGroup);
+      window._clusterGroup = null;
+      window._custDots = [];
+    }
     if (map.getZoom() >= DOT_ZOOM_THRESHOLD) drawAllCustomerDots();
   } else {
+    leadMarkers.forEach(m => map.removeLayer(m));
+    leadMarkers = [];
     refreshLeadPins(activeSuburbKey || null);
   }
 }
@@ -2146,13 +2154,10 @@ function drawAllCustomerDots() {
         isReal = true;
         realCount++;
       } else {
-        // Suburb-centre fallback — scatter in a ring
-        const angle = (fallbackIdx / Math.max(fallbackTotal, 1)) * 2 * Math.PI;
-        lat = cLat + Math.sin(angle) * latSpread * 0.25;
-        lng = cLng + Math.cos(angle) * lngSpread * 0.25;
-        fallbackIdx++;
-        isReal = false;
+        // Skip suburb-centre fallbacks — they show as rings and add noise
+        // These customers are already in the sidebar list
         fallbackCount++;
+        return;
       }
 
       // Skip if rep dimmed or type hidden
